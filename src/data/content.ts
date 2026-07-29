@@ -4,7 +4,7 @@ export const profile = {
   tagline:
     "I build fast, tactile interfaces for the web — and occasionally let the GPU show off.",
   email: "brian.fu123321@gmail.com",
-  github: "https://github.com/LALALOLO123",
+  github: "https://github.com/jiacheng-fu",
   location: "On the web",
 };
 
