@@ -67,6 +67,15 @@ export const projects: Project[] = [
   },
   {
     index: "06",
+    title: "Wild West Party Game",
+    blurb:
+      "A live-multiplayer western party game built in 24 hours at HowdyHack 2024. I built the frontend: the frame system that sequences every connected client through the game's states together, scene transitions, the drawing canvas, and the player input components.",
+    stack: ["TypeScript", "Next.js", "WebSockets"],
+    year: "2024",
+    href: "https://github.com/jiacheng-fu/wild-west-party-game",
+  },
+  {
+    index: "07",
     title: "This Site",
     blurb:
       "A hand-written WebGL fragment shader that warps toward your cursor, with scroll-linked reveals throughout. No component library, no template.",
@@ -92,8 +101,8 @@ export const stack = [
 ];
 
 export const facts = [
-  { label: "Education", value: "Texas A&M — BS Computer Science" },
-  { label: "Graduating", value: "December 2027" },
+  { label: "Education", value: "Texas A&M — BS CS, Math minor" },
+  { label: "Graduating", value: "December 2027 · 3.87 GPA" },
   { label: "Based", value: "Austin, Texas" },
   { label: "Seeking", value: "Summer 2027 SWE internship" },
 ];
