@@ -628,8 +628,8 @@
      the canvas occupy exactly the same box and nothing shifts on swap. The
      ratio matches the board's own on-screen proportions at this camera angle,
      so the fit solver is not left with dead space above and below. */
-  aspect-ratio: 5 / 2;
-  max-height: 56vh;
+  aspect-ratio: 16 / 7;
+  max-height: 60vh;
   touch-action: pan-y;
 }
 

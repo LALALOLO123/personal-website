@@ -46,6 +46,7 @@ const ROW_LIFT = [0.34, 0.22, 0.17, 0.22];
 const ROW_TILT = [-0.17, -0.07, 0.02, 0.12];
 
 const BASE_TILT = 0.07; // back edge raised, like a board sitting on its feet
+const YAW = -0.42; // three-quarter product angle, per the Apple treatment
 
 type Placed = Cap & { x: number; z: number; row: number; capW: number };
 
@@ -329,23 +330,23 @@ function FitCamera({ width, depth }: { width: number; depth: number }) {
     // the real bounding corners and pull back until the worst one fits.
     const hw = width / 2 + 0.42; // + the case lip
     const hd = depth / 2 + 0.42;
-    const tilt = new THREE.Vector3(1, 0, 0);
+    const rot = new THREE.Euler(BASE_TILT, YAW, 0);
     const corners: THREE.Vector3[] = [];
     for (const sx of [-1, 1]) {
       for (const sz of [-1, 1]) {
         for (const sy of [-0.5, 0.7]) {
-          corners.push(new THREE.Vector3(sx * hw, sy, sz * hd).applyAxisAngle(tilt, BASE_TILT));
+          corners.push(new THREE.Vector3(sx * hw, sy, sz * hd).applyEuler(rot));
         }
       }
     }
 
-    const FILL = 0.94; // fraction of the frame the board should occupy
+    const FILL = 0.97; // fraction of the frame the board should occupy
     const probe = new THREE.Vector3();
     let dist = 8;
 
     for (let i = 0; i < 8; i++) {
       camera.aspect = size.width / Math.max(1, size.height);
-      camera.position.set(0, dist * 0.6, dist * 0.8);
+      camera.position.set(dist * 0.16, dist * 0.44, dist * 0.88);
       camera.lookAt(0, 0, 0);
       camera.updateMatrixWorld(true);
       camera.updateProjectionMatrix();
@@ -359,7 +360,7 @@ function FitCamera({ width, depth }: { width: number; depth: number }) {
       dist *= worst / FILL;
     }
 
-    camera.position.set(0, dist * 0.6, dist * 0.8);
+    camera.position.set(dist * 0.16, dist * 0.44, dist * 0.88);
     camera.lookAt(0, 0, 0);
     camera.updateProjectionMatrix();
   }, [camera, size.width, size.height, width, depth]);
@@ -472,9 +473,9 @@ function Board({ onHover }: { onHover: (label: string | null) => void }) {
 
         <ContactShadows
           position={[0, -0.5, 0]}
-          opacity={0.38}
-          scale={width + 1.6}
-          blur={3.4}
+          opacity={0.3}
+          scale={width + 2}
+          blur={4.2}
           far={2.2}
           resolution={512}
           color="#2a2622"
@@ -498,7 +499,7 @@ export default function Keyboard3D({ paused = false }: { paused?: boolean }) {
         shadows
         dpr={[1, 1.75]}
         frameloop={paused ? "never" : "always"}
-        camera={{ position: [0, 5.5, 6.7], fov: 32 }}
+        camera={{ position: [0, 5.5, 6.7], fov: 26 }}
         gl={{ alpha: true, antialias: true }}
         onCreated={({ gl }) => {
           gl.toneMapping = THREE.ACESFilmicToneMapping;
