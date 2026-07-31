@@ -1,4 +1,19 @@
 # Personal Website
+**Live: https://brianfu.vercel.app**
+
+Portfolio site. React + TypeScript + Vite, deployed on Vercel.
+
+The background is a hand-written WebGL fragment shader: domain-warped fBm (noise
+of noise) with a cosine palette, warping toward the pointer. The palette phase
+offsets are kept tight on purpose - spreading them sends the channels out of step
+and produces a full-spectrum rainbow that competes with the type.
+
+Project rows track their own scroll progress through a spring rather than firing
+a single whileInView tween, so they keep easing as you scroll instead of snapping
+once. All motion is gated behind `useReducedMotion` and a `prefers-reduced-motion`
+block.
+
+    npm install && npm run dev
 
 An animated, generative personal site — built as much to *be* a piece of work as to describe one.
 
