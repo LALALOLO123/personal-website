@@ -56,8 +56,8 @@ export default function Cursor() {
       const scale = (hovering ? 1.9 : 1) * (down ? 0.7 : 1);
       ring.style.transform = `translate3d(${ringPos.x}px, ${ringPos.y}px, 0) translate(-50%, -50%) scale(${scale})`;
       ring.style.borderColor = hovering
-        ? "rgba(232, 195, 126, 0.9)"
-        : "rgba(244, 241, 234, 0.5)";
+        ? "rgba(255, 156, 130, 0.95)"
+        : "rgba(255, 255, 255, 0.55)";
       raf = requestAnimationFrame(loop);
     };
     raf = requestAnimationFrame(loop);
@@ -84,7 +84,10 @@ export default function Cursor() {
           width: 34,
           height: 34,
           borderRadius: "50%",
-          border: "1px solid rgba(244,241,234,0.5)",
+          border: "1px solid rgba(255,255,255,0.55)",
+          /* The ring crosses both the light page and the dark keyboard;
+             difference blending keeps it visible against either. */
+          mixBlendMode: "difference",
           pointerEvents: "none",
           zIndex: 9999,
           transition: "border-color 0.25s ease",

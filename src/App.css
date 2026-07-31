@@ -221,7 +221,7 @@
   inset: 0;
   background: linear-gradient(
     90deg,
-    rgba(232, 195, 126, 0.07),
+    rgb(var(--accent-rgb) / 0.07),
     transparent 70%
   );
   transform: translateX(-100%);
@@ -357,7 +357,7 @@
   left: 0;
   right: 0;
   height: 2px;
-  background: linear-gradient(90deg, var(--accent), rgba(232, 195, 126, 0.35));
+  background: linear-gradient(90deg, var(--accent), rgb(var(--accent-rgb) / 0.35));
   transform-origin: 0 50%;
   z-index: 100;
   pointer-events: none;
@@ -383,7 +383,7 @@
   display: inline-block;
   margin-left: 0.75rem;
   padding: 0.15em 0.6em;
-  border: 1px solid rgba(232, 195, 126, 0.4);
+  border: 1px solid rgb(var(--accent-rgb) / 0.4);
   border-radius: 999px;
   font-family: var(--font-mono);
   font-size: 0.6rem;
@@ -467,7 +467,7 @@
   color: color-mix(in oklab, var(--ink) calc(18% + var(--f) * 82%), transparent);
   transform: scale(calc(1 + var(--f) * 0.045));
   text-shadow: 0 0 calc(var(--f) * 26px)
-    rgba(232, 195, 126, calc(var(--f) * 0.28));
+    rgb(var(--accent-rgb) / calc(var(--f) * 0.28));
   will-change: transform, color;
 }
 
@@ -511,14 +511,14 @@
   inset: 0;
   background: radial-gradient(
     120% 100% at 0% 0%,
-    rgba(232, 195, 126, 0.07),
+    rgb(var(--accent-rgb) / 0.07),
     transparent 60%
   );
   opacity: 0;
   transition: opacity 0.6s var(--ease-out);
 }
 .artifact__card:hover {
-  border-color: rgba(232, 195, 126, 0.35);
+  border-color: rgb(var(--accent-rgb) / 0.35);
   transform: translateY(-3px);
 }
 .artifact__card:hover::before {
@@ -538,7 +538,7 @@
 }
 .artifact__live {
   padding: 0.2em 0.7em;
-  border: 1px solid rgba(232, 195, 126, 0.4);
+  border: 1px solid rgb(var(--accent-rgb) / 0.4);
   border-radius: 999px;
   font-family: var(--font-mono);
   font-size: 0.6rem;
@@ -605,5 +605,161 @@
 @media (max-width: 640px) {
   .skillfield__item {
     font-size: clamp(1.25rem, 6.5vw, 1.9rem);
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   The board
+
+   The skills section is a 3D mechanical keyboard: one key per technology,
+   logo on the cap, name on hover. Three.js is code-split and only fetched
+   when this section approaches the viewport, so everything here has to hold
+   the layout steady before the canvas exists.
+   --------------------------------------------------------------------------- */
+
+.kb-host {
+  margin-top: 2rem;
+}
+
+.kb {
+  position: relative;
+  width: 100%;
+  /* Reserved by aspect ratio rather than a fixed height so the skeleton and
+     the canvas occupy exactly the same box and nothing shifts on swap. The
+     ratio matches the board's own on-screen proportions at this camera angle,
+     so the fit solver is not left with dead space above and below. */
+  aspect-ratio: 5 / 2;
+  max-height: 56vh;
+  touch-action: pan-y;
+}
+
+.kb__canvas {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+  /* The page's shader background shows through; the canvas is transparent. */
+  background: transparent;
+  animation: kb-in 1.2s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes kb-in {
+  from {
+    opacity: 0;
+    transform: translateY(26px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Holds the exact same box while the chunk downloads. Deliberately quiet -
+   a spinner here would be louder than the thing it is standing in for. */
+.kb--skeleton::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 54%;
+  width: min(70%, 620px);
+  height: 34%;
+  transform: translate(-50%, -50%) perspective(900px) rotateX(52deg);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: linear-gradient(
+    100deg,
+    transparent 34%,
+    rgb(var(--accent-rgb) / 0.07) 50%,
+    transparent 66%
+  );
+  background-size: 260% 100%;
+  animation: kb-shimmer 2.4s ease-in-out infinite;
+}
+
+@keyframes kb-shimmer {
+  from {
+    background-position: 140% 0;
+  }
+  to {
+    background-position: -40% 0;
+  }
+}
+
+/* Floating label pinned to the hovered key. drei renders this into a wrapper
+   div it owns, so the wrapper must not eat pointer events or the key would
+   lose hover the moment the label appeared over it. */
+.kb-label-wrap {
+  pointer-events: none !important;
+}
+
+.kb-label {
+  display: block;
+  white-space: nowrap;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #fff;
+  background: var(--ink);
+  padding: 0.34rem 0.62rem;
+  border-radius: 3px;
+  box-shadow: 0 8px 24px rgba(22, 21, 15, 0.28);
+  animation: kb-label-in 0.22s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes kb-label-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.kb__caption {
+  position: absolute;
+  left: 0;
+  bottom: -0.4rem;
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+  pointer-events: none;
+}
+
+/* A keyboard needs width to stay legible. Below that the flat field reads
+   better than a squashed board, and it works on touch. */
+@media (max-width: 720px) {
+  /* Still wide, just less extreme - the fit solver sizes the board to the box,
+     so a squarer box here only buys dead space above and below it. */
+  .kb {
+    aspect-ratio: 16 / 9;
+  }
+  .kb__caption {
+    display: none;
+  }
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kb__canvas,
+  .kb--skeleton::after,
+  .kb-label {
+    animation: none;
   }
 }

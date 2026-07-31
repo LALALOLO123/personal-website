@@ -1,9 +1,13 @@
 :root {
-  --bg: #050505;
-  --ink: #f4f1ea;
-  --ink-dim: #8a857c;
-  --accent: #e8c37e;
-  --line: rgba(244, 241, 234, 0.12);
+  /* Light paper, near-black ink, one saturated accent. The keyboard is the
+     only dark mass on the page, which makes the brand-coloured keycap logos
+     the loudest thing in the composition - which is the point. */
+  --bg: #f3f1ed;
+  --ink: #16150f;
+  --ink-dim: #6e6a60;
+  --accent: #cf3f22;
+  --accent-rgb: 207, 63, 34;
+  --line: rgba(22, 21, 15, 0.14);
 
   --font-display: "Instrument Serif", Georgia, serif;
   --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
@@ -24,7 +28,16 @@ html {
 }
 
 body {
+  /* A single very soft warm-to-cool wash replaces the old WebGL shader. It
+     costs nothing, and the page no longer needs a second GL context. */
   background: var(--bg);
+  background-image: radial-gradient(
+      108% 74% at 12% -6%,
+      rgba(207, 63, 34, 0.05),
+      transparent 62%
+    ),
+    radial-gradient(92% 68% at 92% 4%, rgba(38, 58, 120, 0.05), transparent 58%);
+  background-attachment: fixed;
   color: var(--ink);
   font-family: var(--font-mono);
   font-weight: 400;
@@ -49,31 +62,19 @@ a {
 
 ::selection {
   background: var(--accent);
-  color: #050505;
+  color: #fff;
 }
 
-/* Film-grain overlay sits above the shader, below the content */
+/* Paper tooth. Multiply rather than overlay so it darkens the light ground
+   into a texture instead of washing it out. */
 .grain {
   position: fixed;
   inset: 0;
   z-index: 1;
   pointer-events: none;
-  opacity: 0.05;
-  mix-blend-mode: overlay;
+  opacity: 0.032;
+  mix-blend-mode: multiply;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-}
-
-/* Thin vignette to focus attention toward the center */
-.vignette {
-  position: fixed;
-  inset: 0;
-  z-index: 1;
-  pointer-events: none;
-  background: radial-gradient(
-    120% 120% at 50% 40%,
-    transparent 55%,
-    rgba(0, 0, 0, 0.55) 100%
-  );
 }
 
 @media (prefers-reduced-motion: reduce) {

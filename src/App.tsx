@@ -8,9 +8,8 @@ import {
   type Variants,
 } from "motion/react";
 import "./App.css";
-import ShaderBackground from "./components/ShaderBackground";
 import Cursor from "./components/Cursor";
-import SkillField from "./components/SkillField";
+import KeyboardSection from "./components/KeyboardSection";
 import { profile, skills, flagship } from "./data/content";
 
 const ease = [0.16, 1, 0.3, 1] as const;
@@ -60,9 +59,7 @@ export default function App() {
 
   return (
     <>
-      <ShaderBackground />
       <div className="grain" />
-      <div className="vignette" />
       <Cursor />
 
       <motion.div className="progress-rail" style={{ scaleX: rail }} />
@@ -149,13 +146,10 @@ export default function App() {
           viewport={{ once: true, margin: "-15%" }}
         >
           <p className="section__label">What I work in</p>
-          <SkillField skills={skills} />
+          <KeyboardSection skills={skills} />
           <p className="field-note">
-            Move through it.{" "}
-            <span className="dim">
-              Everything above is something I&rsquo;ve shipped with, not something
-              I&rsquo;ve read about.
-            </span>
+            Every key is something I&rsquo;ve shipped with.{" "}
+            <span className="dim">Hover one.</span>
           </p>
         </motion.section>
 
