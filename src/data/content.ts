@@ -1,11 +1,12 @@
 export const profile = {
   name: "Brian Fu",
-  role: "Developer & Creative Technologist",
+  role: "Software Engineer",
   tagline:
-    "I build fast, tactile interfaces for the web — and occasionally let the GPU show off.",
+    "CS at Texas A&M, graduating December 2027. I gravitate to problems where correctness is checkable — compilers, backends, and the security boundaries in between.",
   email: "brian.fu123321@gmail.com",
   github: "https://github.com/jiacheng-fu",
-  location: "On the web",
+  linkedin: "https://linkedin.com/in/jiachengfu",
+  location: "Austin, Texas",
 };
 
 export type Project = {
@@ -15,51 +16,84 @@ export type Project = {
   stack: string[];
   year: string;
   href?: string;
+  live?: string;
 };
 
-// Placeholder work — swap these for real projects anytime.
+/** Real work only. Every entry is backed by a repo, a live URL, or shipped employment. */
 export const projects: Project[] = [
   {
     index: "01",
-    title: "Aurora Engine",
+    title: "CarScout",
     blurb:
-      "A GPU-driven generative background system. The shader on this very page.",
-    stack: ["WebGL", "GLSL", "React"],
+      "An AI-powered used-car platform I built and own end to end. Free-form input becomes validated JSON through an LLM pipeline with schema sanitization and automatic failover; a 10-level constraint-relaxation algorithm ranks listings so you never hit an empty page. Deployed on Lambda with a DynamoDB cache that keeps it inside a 1,000-call/month budget.",
+    stack: ["React", "FastAPI", "AWS Lambda", "DynamoDB", "PostgreSQL"],
     year: "2026",
+    href: "https://github.com/jiacheng-fu/CarScout",
+    live: "https://d1j3m9qdbgs5ik.cloudfront.net",
   },
   {
     index: "02",
-    title: "Signal",
+    title: "vDSP Compiler Backend",
     blurb:
-      "Real-time collaborative editor with conflict-free sync and a buttery presence layer.",
-    stack: ["TypeScript", "CRDT", "WebSockets"],
+      "An LLVM backend for a proprietary vector DSP at Bridgecom Semiconductors — instruction selection, register allocation, lowering strategies, and a technical report that steered the architecture. The abstraction bottoms out here, which is the part I liked.",
+    stack: ["LLVM", "C++", "SystemRDL"],
     year: "2025",
   },
   {
     index: "03",
-    title: "Cartograph",
+    title: "Platform Hardening",
     blurb:
-      "Interactive data-viz toolkit that turns messy CSVs into explorable spatial stories.",
-    stack: ["D3", "Canvas", "Vite"],
-    year: "2025",
+      "Application security at ThingsX. Closed a cross-tenant leak exposing 11,000+ records through an RPC missing authorization checks, then proved it dead by reproducing the exploit in reverse. Every guard is mutation-tested — reverted individually to confirm the suite actually fails without it.",
+    stack: ["TypeScript", "Deno", "PostgreSQL", "RLS"],
+    year: "2026",
   },
   {
     index: "04",
-    title: "Latermind",
+    title: "Project Horizon",
     blurb:
-      "A tiny, opinionated read-later app with offline-first sync and zero tracking.",
-    stack: ["React", "IndexedDB", "PWA"],
-    year: "2024",
+      "A narrative exploration game built solo in Unity. Branching storyline with multiple outcomes, dialogue with voiceover sync, state management, and the full development cycle owned start to finish.",
+    stack: ["C#", "Unity"],
+    year: "2023",
+    href: "https://github.com/jiacheng-fu/project-horizon",
+  },
+  {
+    index: "05",
+    title: "CarStatus",
+    blurb:
+      "A CLI for live BMW telemetry over the Smartcar API — odometer, fuel and battery, location. Small, but it talks to a real car.",
+    stack: ["JavaScript", "Node", "Smartcar API"],
+    year: "2025",
+    href: "https://github.com/jiacheng-fu/CarStatus",
+  },
+  {
+    index: "06",
+    title: "This Site",
+    blurb:
+      "A hand-written WebGL fragment shader that warps toward your cursor, with scroll-linked reveals throughout. No component library, no template.",
+    stack: ["WebGL", "GLSL", "Motion"],
+    year: "2026",
+    href: "https://github.com/jiacheng-fu/personal-website",
   },
 ];
 
 export const stack = [
   "TypeScript",
+  "Python",
+  "C++",
+  "Java",
   "React",
+  "FastAPI",
+  "Node / Deno",
+  "PostgreSQL",
+  "AWS",
+  "Docker",
+  "LLVM",
   "WebGL / GLSL",
-  "Node",
-  "Rust",
-  "Vite",
-  "Framer Motion",
-  "Postgres",
+];
+
+export const facts = [
+  { label: "Education", value: "Texas A&M — BS Computer Science" },
+  { label: "Graduating", value: "December 2027" },
+  { label: "Based", value: "Austin, Texas" },
+  { label: "Seeking", value: "Summer 2027 SWE internship" },
 ];

@@ -344,3 +344,89 @@
   text-transform: uppercase;
   color: var(--ink-dim);
 }
+
+/* ---------------------------------------------------------------------------
+   Additions for the scroll-linked rebuild
+   --------------------------------------------------------------------------- */
+
+/* Reading-progress rail. Fixed above everything, scaled from a spring-smoothed
+   scroll value so it glides instead of tracking the wheel step for step. */
+.progress-rail {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, var(--accent), rgba(232, 195, 126, 0.35));
+  transform-origin: 0 50%;
+  z-index: 100;
+  pointer-events: none;
+}
+
+/* The wrapper carries the scroll transform so .proj keeps its own hover
+   transforms. Putting both on one element makes them fight. */
+.proj-wrap {
+  will-change: transform, opacity, filter;
+}
+
+.proj {
+  text-decoration: none;
+  color: inherit;
+}
+
+.proj__body {
+  min-width: 0;
+}
+
+/* "Live" tag next to a project that has a real URL behind it. */
+.proj__live {
+  display: inline-block;
+  margin-left: 0.75rem;
+  padding: 0.15em 0.6em;
+  border: 1px solid rgba(232, 195, 126, 0.4);
+  border-radius: 999px;
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent);
+  vertical-align: middle;
+  transform: translateY(-0.15em);
+}
+.proj__live::before {
+  content: "";
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  margin-right: 0.45em;
+  border-radius: 50%;
+  background: var(--accent);
+  vertical-align: middle;
+  animation: live-pulse 2.4s ease-in-out infinite;
+}
+@keyframes live-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%      { opacity: 0.35; transform: scale(0.8); }
+}
+
+/* The hero meta grew from three inline spans to four label/value facts. */
+.hero__meta {
+  flex-wrap: wrap;
+  gap: 1.4rem 2.4rem;
+}
+
+/* Respect the OS setting. The shader and reveals are decorative; nobody should
+   get motion sickness from a portfolio. */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .proj-wrap {
+    opacity: 1 !important;
+    filter: none !important;
+    transform: none !important;
+  }
+}

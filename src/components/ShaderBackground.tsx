@@ -54,12 +54,17 @@ float fbm(vec2 p) {
   return v;
 }
 
-// iridescent palette (Inigo Quilez cosine palette)
+// Warm ember palette (Inigo Quilez cosine palette).
+// The amplitude (b) is deliberately small and the phase offsets (d) are close
+// together: a wide phase spread sends the three channels out of step and gives
+// you a full-spectrum rainbow, which fought the foreground type. Keeping them
+// tight holds the whole field in one amber-to-ash family around the --accent
+// hue, so it reads as atmosphere rather than as the subject.
 vec3 palette(float t) {
-  vec3 a = vec3(0.16, 0.13, 0.20);
-  vec3 b = vec3(0.42, 0.34, 0.30);
+  vec3 a = vec3(0.085, 0.070, 0.062);
+  vec3 b = vec3(0.105, 0.078, 0.048);
   vec3 c = vec3(1.00, 1.00, 1.00);
-  vec3 d = vec3(0.00, 0.18, 0.42);
+  vec3 d = vec3(0.04, 0.09, 0.15);
   return a + b * cos(6.28318 * (c * t + d));
 }
 
@@ -68,7 +73,7 @@ void main() {
   vec2 p = uv;
   p.x *= u_res.x / u_res.y;
 
-  float t = u_time * 0.05;
+  float t = u_time * 0.032;
 
   // pointer creates a soft gravitational warp in the flow field
   vec2 m = u_mouse;
@@ -86,12 +91,14 @@ void main() {
 
   vec3 col = palette(f + 0.15 * length(r) + t * 0.4);
 
-  // deepen toward near-black so foreground text stays readable
-  col *= 0.55 + 0.45 * f;
-  col = mix(vec3(0.02, 0.02, 0.025), col, smoothstep(0.0, 0.9, f + 0.25));
+  // Deepen hard toward near-black. This is a portfolio, not a screensaver: the
+  // text has to win every contrast comparison, so the field only brightens in
+  // the densest parts of the flow and stays near the page background elsewhere.
+  col *= 0.30 + 0.42 * f;
+  col = mix(vec3(0.019, 0.019, 0.021), col, smoothstep(0.05, 1.05, f + 0.10));
 
   // subtle pointer halo
-  col += vec3(0.9, 0.75, 0.45) * pull * 0.12;
+  col += vec3(0.85, 0.70, 0.42) * pull * 0.055;
 
   // gentle horizontal banding for an atmospheric, scanned feel
   col *= 1.0 - 0.04 * sin(uv.y * 800.0);
