@@ -19,21 +19,14 @@ type Cap = { label: string; w: number; blank?: boolean };
 
 const k = (label: string): Cap => ({ label, w: 1 });
 
-const ROWS: { stagger: number; caps: Cap[] }[] = [
-  { stagger: 0.0, caps: ["Vite", "Next.js", "Bash", "Git", "CI/CD", "Docker", "LLVM"].map(k) },
-  { stagger: 0.3, caps: ["Node", "Deno", "Java", "C#", "GLSL", "WebGL", "Unity"].map(k) },
-  { stagger: 0.6, caps: ["TypeScript", "Python", "C++", "React", "FastAPI", "PostgreSQL", "SQL"].map(k) },
-  {
-    stagger: 0.15,
-    caps: [
-      k("AWS Lambda"),
-      k("DynamoDB"),
-      { label: "shipped, not read about", w: 3, blank: true },
-      k("Supabase"),
-      k("REST APIs"),
-      k("Row-Level Security"),
-    ],
-  },
+/* A real 60%-style layout: every row sums to exactly 10u so the edges are
+   flush, and the wordmark skills ride the wide modifier caps the way Tab,
+   Caps, and Enter would. Bottom row: blank mods flanking the spacebar. */
+const ROWS: { caps: Cap[] }[] = [
+  { caps: [k("Vite"), k("Next.js"), k("Bash"), k("Git"), k("CI/CD"), k("Docker"), k("LLVM"), { label: "GLSL", w: 1.5 }, { label: "WebGL", w: 1.5 }] },
+  { caps: [{ label: "C#", w: 1.5 }, k("Node"), k("Deno"), k("Java"), k("Unity"), k("TypeScript"), k("Python"), k("C++"), { label: "SQL", w: 1.5 }] },
+  { caps: [{ label: "REST APIs", w: 1.75 }, k("React"), k("FastAPI"), k("PostgreSQL"), k("Supabase"), k("AWS Lambda"), k("DynamoDB"), { label: "Row-Level Security", w: 2.25 }] },
+  { caps: [{ label: "", w: 1.25, blank: true }, { label: "", w: 1.25, blank: true }, { label: "shipped, not read about", w: 5, blank: true }, { label: "", w: 1.25, blank: true }, { label: "", w: 1.25, blank: true }] },
 ];
 
 const U = 1.0; // one key unit
@@ -46,16 +39,25 @@ const CAP_H = 0.54;
 const ROW_LIFT = [0.34, 0.22, 0.17, 0.22];
 const ROW_TILT = [-0.17, -0.07, 0.02, 0.12];
 
-/* The product pose from Brian's reference photo: board stood nearly on its
-   corner, face toward camera, long axis running lower-right to upper-left. */
-const POSE = { x: 1.08, y: 0.3, z: -0.92 };
+/* The product pose from Brian's reference photo: standing on one corner,
+   LONG SIDE VERTICAL with a slight lean, face toward the camera. Composed in
+   world space - first tip the face to the camera, then roll around the view
+   axis - so the angles mean what they say. */
+const FINAL_Q = new THREE.Quaternion()
+  .setFromAxisAngle(new THREE.Vector3(0, 0, 1), -(Math.PI / 2 - 0.32))
+  .multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), 1.32));
+const FLAT_Q = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), 0.22);
+
+/* Everything the whole board shares per frame; Key legends read the lamp so
+   the unlit logo materials cannot glow before the spotlight is on. */
+const STAGE = { lamp: 1 };
 
 type Placed = Cap & { x: number; z: number; row: number; capW: number };
 
 function buildLayout() {
   const placed: Placed[] = [];
   ROWS.forEach((row, r) => {
-    let x = row.stagger;
+    let x = 0;
     for (const cap of row.caps) {
       placed.push({ ...cap, capW: cap.w * U - GAP, x: x + (cap.w * U) / 2, z: r * U, row: r });
       x += cap.w * U;
@@ -160,54 +162,55 @@ function inkBounds(path: string) {
 }
 
 function legendTexture(cap: Cap): THREE.CanvasTexture | null {
+  if (!cap.label) return null; // blank modifier caps carry nothing
   const S = 256;
+  // Canvas aspect matches the legend plane on this cap, so wide caps get
+  // wide textures and nothing ever stretches.
+  const capW = cap.w * U - GAP;
+  const planeAspect = (capW * 0.78) / ((U - GAP) * 0.7);
+  const W = Math.max(1, Math.round(S * planeAspect));
   const c = document.createElement("canvas");
+  c.width = W;
+  c.height = S;
   const ctx = c.getContext("2d");
   if (!ctx) return null;
+  ctx.fillStyle = "#ffffff";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
 
+  const L = LEGENDS[cap.label];
   if (cap.blank) {
-    // Novelty spacebar: letterspaced type, shrunk to whatever actually fits.
-    c.width = S * 3;
-    c.height = S;
-    ctx.fillStyle = "#ffffff";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-
+    // the spacebar motto: letterspaced type, shrunk to fit
     const spaced = cap.label.split("").join(" ");
-    const face = `500 %dpx "JetBrains Mono", ui-monospace, monospace`;
-    let size = S * 0.15;
-    ctx.font = face.replace("%d", String(size));
-    const maxW = S * 3 * 0.88;
+    const face = (n: number) => `500 ${n}px "JetBrains Mono", ui-monospace, monospace`;
+    let size = S * 0.16;
+    ctx.font = face(size);
     const measured = ctx.measureText(spaced).width;
-    if (measured > maxW) {
-      size *= maxW / measured;
-      ctx.font = face.replace("%d", String(size));
+    if (measured > W * 0.88) {
+      size *= (W * 0.88) / measured;
+      ctx.font = face(size);
     }
-    ctx.fillText(spaced, (S * 3) / 2, S / 2);
-  } else {
-    const L = LEGENDS[cap.label];
-    if (!L) return null;
-    c.width = c.height = S;
-    ctx.fillStyle = "#ffffff";
-
-    if (L.path) {
-      const b = inkBounds(L.path);
-      if (!b) return null;
-      // Wordmarks may run wider than square marks, so width and height get
-      // separate ceilings and the tighter one wins.
-      const scale = Math.min((S * 0.74) / b.w, (S * 0.62) / b.h);
-      ctx.save();
-      ctx.translate(S / 2 - (b.x + b.w / 2) * scale, S / 2 - (b.y + b.h / 2) * scale);
-      ctx.scale(scale, scale);
-      ctx.fill(new Path2D(L.path));
-      ctx.restore();
-    } else if (L.text) {
-      const size = L.text.length > 3 ? S * 0.26 : S * 0.34;
+    ctx.fillText(spaced, W / 2, S / 2);
+  } else if (L?.path) {
+    const b = inkBounds(L.path);
+    if (!b) return null;
+    const scale = Math.min((W * 0.56) / b.w, (S * 0.6) / b.h);
+    ctx.save();
+    ctx.translate(W / 2 - (b.x + b.w / 2) * scale, S / 2 - (b.y + b.h / 2) * scale);
+    ctx.scale(scale, scale);
+    ctx.fill(new Path2D(L.path));
+    ctx.restore();
+  } else if (L?.text) {
+    let size = L.text.length > 3 ? S * 0.26 : S * 0.34;
+    ctx.font = `700 ${size}px "JetBrains Mono", ui-monospace, monospace`;
+    const measured = ctx.measureText(L.text).width;
+    if (measured > W * 0.8) {
+      size *= (W * 0.8) / measured;
       ctx.font = `700 ${size}px "JetBrains Mono", ui-monospace, monospace`;
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillText(L.text, S / 2, S / 2 + size * 0.04);
     }
+    ctx.fillText(L.text, W / 2, S / 2 + size * 0.04);
+  } else {
+    return null;
   }
 
   const tex = new THREE.CanvasTexture(c);
@@ -273,7 +276,10 @@ const Key = memo(function Key({ cap, geometry, texture, active, onEnter, onLeave
     const p = press.current;
 
     if (group.current) group.current.position.y = baseY - p * TRAVEL;
-    if (legendMat.current) legendMat.current.color.lerpColors(rest, brand, p);
+    if (legendMat.current) {
+      legendMat.current.color.lerpColors(rest, brand, p);
+      legendMat.current.color.multiplyScalar(STAGE.lamp);
+    }
     if (capMat.current) capMat.current.color.lerpColors(CAP_REST, CAP_HOVER, p);
   });
 
@@ -296,8 +302,8 @@ const Key = memo(function Key({ cap, geometry, texture, active, onEnter, onLeave
   // top face rather than tucking it into the scoop means it can never be
   // swallowed by the cap, and 4 thousandths of a unit is invisible at this size.
   const legendY = CAP_H / 2 + 0.004;
-  const legendW = cap.capW * (cap.blank ? 0.74 : 0.64);
-  const legendD = (U - GAP) * 0.64;
+  const legendW = cap.capW * 0.78;
+  const legendD = (U - GAP) * 0.7;
 
   return (
     <group ref={group} position={[cap.x, baseY, cap.z]} rotation={[ROW_TILT[cap.row], 0, 0]}>
@@ -305,17 +311,17 @@ const Key = memo(function Key({ cap, geometry, texture, active, onEnter, onLeave
         geometry={geometry}
         castShadow
         receiveShadow
-        onPointerOver={enter}
-        onPointerOut={leave}
+        onPointerOver={cap.label ? enter : undefined}
+        onPointerOut={cap.label ? leave : undefined}
         /* Touch has no hover, so a tap has to stand in for one. */
-        onPointerDown={enter}
+        onPointerDown={cap.label ? enter : undefined}
       >
         <meshStandardMaterial ref={capMat} color={CAP_COLOR} roughness={WAY.capRough} metalness={WAY.capMetal} />
       </mesh>
 
       {texture && (
         <mesh position={[0, legendY, 0]} rotation={[-Math.PI / 2, 0, 0]} renderOrder={2}>
-          <planeGeometry args={[legendW, cap.blank ? legendW / 3 : legendD]} />
+          <planeGeometry args={[legendW, legendD]} />
           {/* Unlit on purpose: a printed legend should read at full strength
               from any angle instead of falling into the cap's own shading. */}
           <meshBasicMaterial
@@ -349,12 +355,14 @@ function FitCamera({ width, depth }: { width: number; depth: number }) {
     // the real bounding corners and pull back until the worst one fits.
     const hw = width / 2 + 0.24; // + the case lip
     const hd = depth / 2 + 0.24;
-    const rot = new THREE.Euler(POSE.x, POSE.y, POSE.z);
+
     const corners: THREE.Vector3[] = [];
     for (const sx of [-1, 1]) {
       for (const sz of [-1, 1]) {
         for (const sy of [-0.5, 0.7]) {
-          corners.push(new THREE.Vector3(sx * hw, sy, sz * hd).applyEuler(rot));
+          const corner = new THREE.Vector3(sx * hw, sy, sz * hd).applyQuaternion(FINAL_Q);
+          corner.y += 0.55; // the board's resting lift
+          corners.push(corner);
         }
       }
     }
@@ -394,31 +402,73 @@ function FitCamera({ width, depth }: { width: number; depth: number }) {
 function Board({
   onHover,
   progress,
+  onLit,
 }: {
   onHover: (label: string | null) => void;
-  /** Scroll progress of the pinned section. Drives the product lift: the
-   *  board starts lying low like it is on a desk and rises into the hero
-   *  pose. Undefined means "just hold the final pose". */
+  /** Scroll progress of the pinned section. Crossing a small threshold ARMS
+   *  the sequence; from there everything runs on its own clock:
+   *  pitch black -> spotlight snaps on over the board lying flat -> half a
+   *  second of stillness -> the board tilts up into the reference pose.
+   *  Undefined means "skip the theatre, hold the final pose, lights on". */
   progress?: MotionValue<number>;
+  /** Fired the moment the spotlight starts turning on (drives the CSS cone). */
+  onLit?: () => void;
 }) {
   const { placed, width, depth } = useMemo(buildLayout, []);
-  const lift = useRef(progress ? 0 : 1);
   const boardGroup = useRef<THREE.Group>(null);
+  const spotRef = useRef<THREE.SpotLight>(null);
+  const ambRef = useRef<THREE.AmbientLight>(null);
+  const fillRef = useRef<THREE.DirectionalLight>(null);
+  const rimRef = useRef<THREE.DirectionalLight>(null);
+  const startAt = useRef<number | null>(progress ? null : -99); // null = waiting in the dark
+  const litFired = useRef(!progress);
 
-  useFrame((_, dt) => {
+  /* Timeline (seconds from trigger, wall-clock so frame stalls cannot slow
+     the choreography - a dropped frame skips ahead instead of dragging):
+     0.00 - 0.45  spotlight ramps on with a flicker, board flat on the floor
+     0.45 - 0.95  hold: half a second of the board just lying there
+     0.95 - 2.15  the tilt-up into POSE, eased hard at the tail            */
+  const FLAT_Y = -2.6;
+  useFrame((state) => {
     const g = boardGroup.current;
     if (!g) return;
-    const target = progress ? THREE.MathUtils.clamp(progress.get() / 0.72, 0, 1) : 1;
-    const step = 1 - Math.pow(0.0002, Math.min(dt, 0.1));
-    lift.current += (target - lift.current) * step;
-    // ease the tail so the settle is gentle
-    const u = 1 - Math.pow(1 - lift.current, 2.2);
-    g.rotation.x = THREE.MathUtils.lerp(0.3, POSE.x, u);
-    g.rotation.y = THREE.MathUtils.lerp(0.05, POSE.y, u);
-    g.rotation.z = THREE.MathUtils.lerp(0, POSE.z, u);
-    g.position.y = THREE.MathUtils.lerp(-2.2, 0, u);
-    const sc = THREE.MathUtils.lerp(0.85, 1, u);
-    g.scale.setScalar(sc);
+
+    const now = state.clock.elapsedTime;
+    if (startAt.current === null) {
+      // still dark: armed only once the section is actually engaged
+      if (progress && progress.get() > 0.04) {
+        startAt.current = now;
+        if (!litFired.current) {
+          litFired.current = true;
+          onLit?.();
+        }
+      }
+    }
+    const t = startAt.current === null ? -1 : startAt.current === -99 ? 99 : now - startAt.current;
+
+    // -- light ramp with a fluorescent stutter --
+    let lamp = 0;
+    if (t >= 0) {
+      const r = THREE.MathUtils.clamp(t / 0.45, 0, 1);
+      lamp = r * r;
+      if (t < 0.3) {
+        // two brief dips, like the ballast catching
+        if (t > 0.08 && t < 0.13) lamp *= 0.25;
+        if (t > 0.19 && t < 0.22) lamp *= 0.45;
+      }
+    }
+    STAGE.lamp = lamp;
+    if (spotRef.current) spotRef.current.intensity = 560 * lamp;
+    if (ambRef.current) ambRef.current.intensity = 0.34 * lamp;
+    if (fillRef.current) fillRef.current.intensity = 0.55 * lamp;
+    if (rimRef.current) rimRef.current.intensity = 0.7 * lamp;
+
+    // -- board: flat and near the lens, then it recedes as it stands up --
+    const u0 = THREE.MathUtils.clamp((t - 0.95) / 1.2, 0, 1);
+    const u = 1 - Math.pow(1 - u0, 3); // ease-out cubic: brisk start, soft landing
+    g.quaternion.slerpQuaternions(FLAT_Q, FINAL_Q, u);
+    g.position.y = THREE.MathUtils.lerp(FLAT_Y, 0.55, u);
+    g.position.z = THREE.MathUtils.lerp(2.5, 0, u);
   });
   const [active, setActive] = useState<string | null>(null);
 
@@ -481,9 +531,30 @@ function Board({
     <>
       <FitCamera width={width} depth={depth} />
 
-      {/* The board is deliberately static. The only thing that moves is the
-          key under the pointer. */}
-      <group ref={boardGroup} rotation={[POSE.x, POSE.y, POSE.z]} onPointerMissed={clear}>
+      {/* the studio rig: everything starts dark and the sequence ramps it */}
+      <ambientLight ref={ambRef} intensity={0} color="#dfe3ea" />
+      <spotLight
+        ref={spotRef}
+        position={[0.5, 14, 4]}
+        angle={0.4}
+        penumbra={0.85}
+        intensity={0}
+        decay={1.6}
+        color="#f4f2ee"
+        castShadow
+        shadow-mapSize={[2048, 2048]}
+        shadow-bias={-0.0012}
+      />
+      <directionalLight ref={fillRef} position={[0, 1, 10]} intensity={0} color="#cdd3dc" />
+      <directionalLight ref={rimRef} position={[-6, 8, -3]} intensity={0} color="#aebacc" />
+
+      {/* the table the board lies on when the light finds it */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -5.4, 0]} receiveShadow>
+        <planeGeometry args={[80, 80]} />
+        <meshStandardMaterial color="#1d1d1f" roughness={0.92} metalness={0.05} />
+      </mesh>
+
+      <group ref={boardGroup} quaternion={FINAL_Q} position={[0, 0.55, 0]} onPointerMissed={clear}>
         <mesh geometry={caseGeo} position={[0, -0.16, 0]} castShadow receiveShadow>
           <meshStandardMaterial color={WAY.case} roughness={0.36} metalness={KB_VARIANT === "white" ? 0.25 : 0.8} />
         </mesh>
@@ -494,9 +565,9 @@ function Board({
           <meshStandardMaterial color={WAY.plate} roughness={0.9} metalness={0.2} />
         </mesh>
 
-        {placed.map((cap) => (
+        {placed.map((cap, i) => (
           <Key
-            key={cap.label}
+            key={`${cap.label}|${i}`}
             cap={cap}
             geometry={geometries.get(cap.w)!}
             texture={textures.get(cap.label) ?? null}
@@ -529,9 +600,11 @@ function Board({
 export default function Keyboard3D({
   paused = false,
   progress,
+  onLit,
 }: {
   paused?: boolean;
   progress?: MotionValue<number>;
+  onLit?: () => void;
 }) {
   const [label, setLabel] = useState<string | null>(null);
 
@@ -551,31 +624,9 @@ export default function Keyboard3D({
       >
         {/* Black studio from the reference photo. The void and the visible
             light cone are painted by the section CSS behind this transparent
-            canvas; the scene contributes the lit board, floor pool, shadow. */}
-        <ambientLight intensity={0.34} color="#dfe3ea" />
-        <spotLight
-          position={[0.5, 14, 4]}
-          angle={0.4}
-          penumbra={0.85}
-          intensity={560}
-          decay={1.6}
-          color="#f4f2ee"
-          castShadow
-          shadow-mapSize={[2048, 2048]}
-          shadow-bias={-0.0012}
-        />
-        {/* soft frontal fill so cap sides do not fall to black */}
-        <directionalLight position={[0, 1, 10]} intensity={0.55} color="#cdd3dc" />
-        {/* faint cool rim from upper left, like the reference */}
-        <directionalLight position={[-6, 8, -3]} intensity={0.7} color="#aebacc" />
-
-        {/* the floor, far enough below that the board floats */}
-        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -4.6, 0]} receiveShadow>
-          <planeGeometry args={[80, 80]} />
-          <meshStandardMaterial color="#1d1d1f" roughness={0.92} metalness={0.05} />
-        </mesh>
-
-        <Board onHover={setLabel} progress={progress} />
+            canvas; the scene contributes the lit board, floor pool, shadow.
+            Lights live inside Board so the switch-on sequence can drive them. */}
+        <Board onHover={setLabel} progress={progress} onLit={onLit} />
       </Canvas>
 
       <p className="kb__caption" aria-live="polite">

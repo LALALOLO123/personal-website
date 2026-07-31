@@ -133,30 +133,19 @@ function Hero({ progress }: { progress: MotionValue<number> }) {
 }
 
 function KeyboardScene({ progress }: { progress: MotionValue<number> }) {
-  const reduce = useReducedMotion();
-  // The label lands first; the board lifts through the middle; the note
-  // arrives once the pose settles.
-  const labelOpacity = useTransform(progress, [0.02, 0.14], [0, 1]);
-  const labelY = useTransform(progress, [0.02, 0.14], [26, 0]);
-  const noteOpacity = useTransform(progress, [0.74, 0.88], [0, 1]);
-  const noteY = useTransform(progress, [0.74, 0.88], [18, 0]);
+  const sceneRef = useRef<HTMLDivElement>(null);
+  // The spotlight cone and every line of copy are gated by this class:
+  // nothing in the scene is visible until the lamp turns on.
+  const handleLit = () => sceneRef.current?.closest(".stage__pin")?.classList.add("is-lit");
 
   return (
-    <div className="section shell field-section">
-      <motion.p
-        className="section__label"
-        style={reduce ? undefined : { opacity: labelOpacity, y: labelY }}
-      >
-        What I work in
-      </motion.p>
-      <KeyboardSection skills={skills} progress={progress} />
-      <motion.p
-        className="field-note"
-        style={reduce ? undefined : { opacity: noteOpacity, y: noteY }}
-      >
+    <div className="section shell field-section" ref={sceneRef}>
+      <p className="section__label">What I work in</p>
+      <KeyboardSection skills={skills} progress={progress} onLit={handleLit} />
+      <p className="field-note">
         Every key is something I&rsquo;ve shipped with.{" "}
         <span className="dim">Hover one.</span>
-      </motion.p>
+      </p>
     </div>
   );
 }
