@@ -30,14 +30,14 @@ const ROWS: { caps: Cap[] }[] = [
 ];
 
 const U = 1.0; // one key unit
-const GAP = 0.07; // gap between adjacent caps
-const TRAVEL = 0.2; // how far a key sinks when hovered
-const CAP_H = 0.54;
+const GAP = 0.16; // airy gaps: every cap reads as its own object
+const TRAVEL = 0.22; // how far a key sinks when hovered
+const CAP_H = 0.62; // tall, chunky, nearly cubic caps
 
-/* Cherry-style sculpting: each row is a different height and angle so the tops
-   all face the same point in front of the board instead of lying flat. */
-const ROW_LIFT = [0.34, 0.22, 0.17, 0.22];
-const ROW_TILT = [-0.17, -0.07, 0.02, 0.12];
+/* Uniform rows, no sculpt: the toy-like grid reads cleaner at product scale
+   than a realistic Cherry profile ever did. */
+const ROW_LIFT = [0.3, 0.3, 0.3, 0.3];
+const ROW_TILT = [0, 0, 0, 0];
 
 /* The product pose from Brian's reference photo: standing on one corner,
    LONG SIDE VERTICAL with a slight lean, face toward the camera. Composed in
@@ -86,10 +86,10 @@ function buildLayout() {
    dish so the top face is scooped instead of flat.
    --------------------------------------------------------------------------- */
 
-const DISH = 0.038;
+const DISH = 0.024;
 
 function makeCapGeometry(w: number, d: number) {
-  const g = new RoundedBoxGeometry(w, CAP_H, d, 6, 0.075);
+  const g = new RoundedBoxGeometry(w, CAP_H, d, 7, 0.12);
   const pos = g.attributes.position as THREE.BufferAttribute;
   const v = new THREE.Vector3();
 
@@ -97,7 +97,7 @@ function makeCapGeometry(w: number, d: number) {
     v.fromBufferAttribute(pos, i);
     const t = THREE.MathUtils.clamp(v.y / CAP_H + 0.5, 0, 1); // 0 base, 1 top
 
-    const taper = 1 - 0.165 * t * t;
+    const taper = 1 - 0.26 * t * t;
     v.x *= taper;
     v.z *= taper;
 
@@ -225,24 +225,41 @@ function legendTexture(cap: Cap): THREE.CanvasTexture | null {
 
 /* Colourway. "white" is the post-black-section variant from the hero video
    plan: clean glossy white like the BRIAN FU street letters. */
-const KB_VARIANT: "dark" | "white" = "white";
+const KB_VARIANT = "candy" as "dark" | "white" | "candy";
 
 const DARKWAY = { cap: "#26262c", hover: "#3a3a44", mute: "#d5d1c8", case: "#17171c", plate: "#0d0d11", capRough: 0.58, capMetal: 0.14 };
 const WHITEWAY = { cap: "#f1efe9", hover: "#ffffff", mute: "#7a766c", case: "#e6e3dc", plate: "#cfccc4", capRough: 0.3, capMetal: 0.05 };
-const WAY = KB_VARIANT === "white" ? WHITEWAY : DARKWAY;
+/* candy: each cap wears its brand colour with a white legend; the case goes
+   near-black soap-bar. Blanks and the spacebar stay charcoal fillers. */
+const CANDYWAY = { cap: "#2b2b31", hover: "#3a3a44", mute: "#e8e5de", case: "#1b1b20", plate: "#101014", capRough: 0.38, capMetal: 0.05 };
+const WAY = KB_VARIANT === "white" ? WHITEWAY : KB_VARIANT === "candy" ? CANDYWAY : DARKWAY;
 
 const CAP_COLOR = WAY.cap;
 const CAP_HOVER = new THREE.Color(WAY.hover);
 const CAP_REST = new THREE.Color(CAP_COLOR);
 const LEGEND_MUTE = new THREE.Color(WAY.mute);
 
+function luminance(hex: string): number {
+  const c = new THREE.Color(hex);
+  return 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b;
+}
+
 /** On white caps, near-white brand marks (Unity, Deno, Next.js, OpenJDK)
  *  would vanish; pull any too-light legend down to ink. */
 function legibleHex(hex: string): string {
   if (KB_VARIANT !== "white") return hex;
+  return luminance(hex) > 0.62 ? "#26262c" : hex;
+}
+
+/** Candy cap colour: the brand hex, darkened a touch when it is too pale to
+ *  hold a white legend, and lifted when it is near-black. */
+function candyCap(label: string): string {
+  const hex = LEGENDS[label]?.hex ?? "#4a4a52";
+  const lum = luminance(hex);
   const c = new THREE.Color(hex);
-  const lum = 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b;
-  return lum > 0.62 ? "#26262c" : hex;
+  if (lum > 0.55) c.offsetHSL(0, 0.06, -0.2);
+  if (lum < 0.08) c.offsetHSL(0, 0, 0.14);
+  return `#${c.getHexString()}`;
 }
 
 type KeyProps = {
@@ -264,9 +281,16 @@ const Key = memo(function Key({ cap, geometry, texture, active, onEnter, onLeave
 
   // Resting legends sit slightly back from full saturation so the board reads
   // as one object; hovering brings the mark to its true brand colour.
-  const [rest, brand] = useMemo(() => {
-    const b = new THREE.Color(legibleHex(cap.blank ? (KB_VARIANT === "white" ? "#8a8578" : "#9a958a") : LEGENDS[cap.label]?.hex ?? "#d5d1c8"));
-    return [b.clone().lerp(LEGEND_MUTE, 0.28), b];
+  const [rest, brand, capRest, capHover] = useMemo(() => {
+    if (KB_VARIANT === "candy" && !cap.blank) {
+      // white legend on a brand-coloured cap; hover brightens the cap itself
+      const white = new THREE.Color("#ffffff");
+      const base = new THREE.Color(candyCap(cap.label));
+      const hover = base.clone().offsetHSL(0, 0.02, 0.09);
+      return [white.clone().multiplyScalar(0.92), white, base, hover];
+    }
+    const b = new THREE.Color(legibleHex(cap.blank ? (KB_VARIANT === "dark" ? "#9a958a" : "#8a8578") : LEGENDS[cap.label]?.hex ?? "#d5d1c8"));
+    return [b.clone().lerp(LEGEND_MUTE, 0.28), b, CAP_REST, CAP_HOVER];
   }, [cap.label, cap.blank]);
 
   useFrame((_, dt) => {
@@ -280,7 +304,7 @@ const Key = memo(function Key({ cap, geometry, texture, active, onEnter, onLeave
       legendMat.current.color.lerpColors(rest, brand, p);
       legendMat.current.color.multiplyScalar(STAGE.lamp);
     }
-    if (capMat.current) capMat.current.color.lerpColors(CAP_REST, CAP_HOVER, p);
+    if (capMat.current) capMat.current.color.lerpColors(capRest, capHover, p);
   });
 
   const enter = useCallback(
@@ -310,7 +334,6 @@ const Key = memo(function Key({ cap, geometry, texture, active, onEnter, onLeave
       <mesh
         geometry={geometry}
         castShadow
-        receiveShadow
         onPointerOver={cap.label ? enter : undefined}
         onPointerOut={cap.label ? leave : undefined}
         /* Touch has no hover, so a tap has to stand in for one. */
@@ -500,7 +523,7 @@ function Board({
   useEffect(() => () => textures.forEach((t) => t?.dispose()), [textures]);
 
   const caseGeo = useMemo(
-    () => new RoundedBoxGeometry(width + 0.78, 0.56, depth + 0.78, 4, 0.16),
+    () => new RoundedBoxGeometry(width + 1.15, 0.95, depth + 1.15, 6, 0.34),
     [width, depth]
   );
   useEffect(() => () => caseGeo.dispose(), [caseGeo]);
@@ -555,12 +578,12 @@ function Board({
       </mesh>
 
       <group ref={boardGroup} quaternion={FINAL_Q} position={[0, 0.55, 0]} onPointerMissed={clear}>
-        <mesh geometry={caseGeo} position={[0, -0.16, 0]} castShadow receiveShadow>
+        <mesh geometry={caseGeo} position={[0, -0.34, 0]} castShadow>
           <meshStandardMaterial color={WAY.case} roughness={0.36} metalness={KB_VARIANT === "white" ? 0.25 : 0.8} />
         </mesh>
 
         {/* switch plate, visible in the gaps between caps */}
-        <mesh position={[0, 0.13, 0]} receiveShadow>
+        <mesh position={[0, 0.13, 0]}>
           <boxGeometry args={[width + 0.34, 0.06, depth + 0.34]} />
           <meshStandardMaterial color={WAY.plate} roughness={0.9} metalness={0.2} />
         </mesh>
