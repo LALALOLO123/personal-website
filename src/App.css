@@ -430,3 +430,180 @@
     transform: none !important;
   }
 }
+
+/* ---------------------------------------------------------------------------
+   Skill field + single artifact
+   The page no longer enumerates projects; these two sections carry it.
+   --------------------------------------------------------------------------- */
+
+.field-section {
+  padding-block: clamp(6rem, 14vh, 11rem);
+}
+
+/* Set at display scale so the words are the composition, not a tag cloud.
+   --f is written per-node from SkillField.tsx (0 = at rest, 1 = under cursor). */
+.skillfield {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  /* generous enough that neighbours do not touch when they scale up under focus */
+  gap: 0.2em 0.8em;
+  margin-top: 2.5rem;
+  /* No narrow measure here: the words should fill the column and wrap into a
+     dense block, so the section reads as one field rather than a list. */
+  max-width: 100%;
+}
+
+.skillfield__item {
+  --f: 0;
+  font-family: var(--font-display);
+  font-size: clamp(1.5rem, 3.6vw, 3rem);
+  line-height: 1.06;
+  letter-spacing: -0.01em;
+  /* multi-word entries ("AWS Lambda", "REST APIs") must not split mid-phrase */
+  white-space: nowrap;
+  /* Everything reads off --f, so one number drives colour, weight and scale
+     together and the word brightens as a single gesture. */
+  color: color-mix(in oklab, var(--ink) calc(18% + var(--f) * 82%), transparent);
+  transform: scale(calc(1 + var(--f) * 0.045));
+  text-shadow: 0 0 calc(var(--f) * 26px)
+    rgba(232, 195, 126, calc(var(--f) * 0.28));
+  will-change: transform, color;
+}
+
+/* The accent only appears at the very centre of focus, so it stays rare. */
+.skillfield__item:nth-child(3n) {
+  color: color-mix(
+    in oklab,
+    var(--accent) calc(var(--f) * 62%),
+    color-mix(in oklab, var(--ink) calc(18% + var(--f) * 60%), transparent)
+  );
+}
+
+.field-note {
+  margin-top: 3rem;
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  letter-spacing: 0.02em;
+  color: var(--ink);
+  max-width: 54ch;
+}
+.field-note .dim {
+  color: var(--ink-dim);
+}
+
+/* ---- the one artifact ---- */
+.artifact__card {
+  display: block;
+  margin-top: 2.5rem;
+  padding: clamp(1.75rem, 4vw, 3rem);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  text-decoration: none;
+  color: inherit;
+  position: relative;
+  overflow: hidden;
+  transition: border-color 0.5s var(--ease-out), transform 0.5s var(--ease-out);
+}
+.artifact__card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    120% 100% at 0% 0%,
+    rgba(232, 195, 126, 0.07),
+    transparent 60%
+  );
+  opacity: 0;
+  transition: opacity 0.6s var(--ease-out);
+}
+.artifact__card:hover {
+  border-color: rgba(232, 195, 126, 0.35);
+  transform: translateY(-3px);
+}
+.artifact__card:hover::before {
+  opacity: 1;
+}
+
+.artifact__head {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+.artifact__title {
+  font-family: var(--font-display);
+  font-size: clamp(2.2rem, 6vw, 3.6rem);
+  line-height: 1;
+}
+.artifact__live {
+  padding: 0.2em 0.7em;
+  border: 1px solid rgba(232, 195, 126, 0.4);
+  border-radius: 999px;
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+.artifact__live::before {
+  content: "";
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  margin-right: 0.5em;
+  border-radius: 50%;
+  background: var(--accent);
+  vertical-align: middle;
+  animation: live-pulse 2.4s ease-in-out infinite;
+}
+
+.artifact__blurb {
+  margin-top: 1.25rem;
+  color: var(--ink-dim);
+  font-size: 0.95rem;
+  max-width: 62ch;
+}
+.artifact__stack {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.1rem;
+  margin-top: 1.5rem;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+}
+.artifact__cta {
+  display: inline-block;
+  margin-top: 1.75rem;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  letter-spacing: 0.06em;
+  color: var(--accent);
+  transition: transform 0.4s var(--ease-out);
+}
+.artifact__card:hover .artifact__cta {
+  transform: translateX(6px);
+}
+
+.artifact__aside {
+  margin-top: 2.25rem;
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  color: var(--ink);
+  max-width: 60ch;
+}
+.artifact__aside .dim {
+  color: var(--ink-dim);
+}
+.artifact__aside a {
+  color: var(--accent);
+}
+
+@media (max-width: 640px) {
+  .skillfield__item {
+    font-size: clamp(1.25rem, 6.5vw, 1.9rem);
+  }
+}

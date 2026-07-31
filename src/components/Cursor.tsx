@@ -10,40 +10,47 @@ export default function Cursor() {
   const dotRef = useRef<HTMLDivElement>(null);
   const [enabled, setEnabled] = useState(false);
 
+  // Detect the pointer type first. This has to be its own effect: the elements
+  // below are gated on `enabled`, so on the very first run the refs are still
+  // null and the non-null assertions that used to be here silenced TypeScript
+  // while the rAF loop threw on every frame.
   useEffect(() => {
-    const fine = window.matchMedia("(pointer: fine)").matches;
-    if (!fine) return;
-    setEnabled(true);
+    if (window.matchMedia("(pointer: fine)").matches) setEnabled(true);
+  }, []);
 
-    const ring = ringRef.current!;
-    const dot = dotRef.current!;
+  useEffect(() => {
+    if (!enabled) return;
+
+    const ring = ringRef.current;
+    const dot = dotRef.current;
+    if (!ring || !dot) return;
 
     const mouse = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
     const ringPos = { ...mouse };
     let hovering = false;
     let down = false;
 
-    function onMove(e: PointerEvent) {
+    const onMove = (e: PointerEvent) => {
       mouse.x = e.clientX;
       mouse.y = e.clientY;
       dot.style.transform = `translate3d(${mouse.x}px, ${mouse.y}px, 0) translate(-50%, -50%)`;
 
       const t = (e.target as HTMLElement)?.closest('[data-cursor="hover"]');
       hovering = !!t;
-    }
-    function onDown() {
+    };
+    const onDown = () => {
       down = true;
-    }
-    function onUp() {
+    };
+    const onUp = () => {
       down = false;
-    }
+    };
 
     window.addEventListener("pointermove", onMove);
     window.addEventListener("pointerdown", onDown);
     window.addEventListener("pointerup", onUp);
 
     let raf = 0;
-    function loop() {
+    const loop = () => {
       ringPos.x += (mouse.x - ringPos.x) * 0.18;
       ringPos.y += (mouse.y - ringPos.y) * 0.18;
       const scale = (hovering ? 1.9 : 1) * (down ? 0.7 : 1);
@@ -52,7 +59,7 @@ export default function Cursor() {
         ? "rgba(232, 195, 126, 0.9)"
         : "rgba(244, 241, 234, 0.5)";
       raf = requestAnimationFrame(loop);
-    }
+    };
     raf = requestAnimationFrame(loop);
 
     return () => {
@@ -61,7 +68,7 @@ export default function Cursor() {
       window.removeEventListener("pointerdown", onDown);
       window.removeEventListener("pointerup", onUp);
     };
-  }, []);
+  }, [enabled]);
 
   if (!enabled) return null;
 

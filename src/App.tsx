@@ -10,18 +10,14 @@ import {
 import "./App.css";
 import ShaderBackground from "./components/ShaderBackground";
 import Cursor from "./components/Cursor";
-import { profile, projects, stack, facts } from "./data/content";
+import SkillField from "./components/SkillField";
+import { profile, skills, flagship } from "./data/content";
 
 const ease = [0.16, 1, 0.3, 1] as const;
 
 const reveal: Variants = {
   hidden: { opacity: 0, y: 28 },
   show: { opacity: 1, y: 0, transition: { duration: 0.9, ease } },
-};
-
-const stagger: Variants = {
-  hidden: {},
-  show: { transition: { staggerChildren: 0.08, delayChildren: 0.05 } },
 };
 
 /** Splits a string into words that rise out of a clipping mask. */
@@ -48,68 +44,9 @@ function AnimatedWords({ text, delay = 0.5 }: { text: string; delay?: number }) 
   );
 }
 
-/**
- * One project row. Each tracks its own scroll progress rather than firing a
- * single whileInView tween, so the row keeps easing as you scroll instead of
- * snapping once and stopping. The spring smooths the raw scroll value, which is
- * what stops it feeling mechanically tied to the wheel.
- */
-function ProjectRow({ p }: { p: (typeof projects)[number] }) {
-  const ref = useRef<HTMLDivElement>(null);
-  const reduce = useReducedMotion();
-  const { scrollYProgress } = useScroll({
-    target: ref,
-    offset: ["start 0.95", "start 0.55"],
-  });
-  const smooth = useSpring(scrollYProgress, {
-    stiffness: 120,
-    damping: 24,
-    restDelta: 0.001,
-  });
-
-  const y = useTransform(smooth, [0, 1], [56, 0]);
-  const opacity = useTransform(smooth, [0, 1], [0, 1]);
-  const blur = useTransform(smooth, [0, 1], ["blur(6px)", "blur(0px)"]);
-
-  const href = p.live || p.href;
-
-  return (
-    <motion.div
-      ref={ref}
-      style={reduce ? undefined : { y, opacity, filter: blur }}
-      className="proj-wrap"
-    >
-      <a
-        className="proj"
-        href={href || `mailto:${profile.email}`}
-        target={href ? "_blank" : undefined}
-        rel={href ? "noreferrer" : undefined}
-        data-cursor="hover"
-      >
-        <span className="proj__index">{p.index}</span>
-        <div className="proj__body">
-          <h3 className="proj__title">
-            {p.title}
-            {p.live && <span className="proj__live">Live</span>}
-          </h3>
-          <p className="proj__blurb">{p.blurb}</p>
-          <div className="proj__stack">
-            {p.stack.map((s) => (
-              <span key={s}>{s}</span>
-            ))}
-          </div>
-        </div>
-        <span className="proj__year">{p.year}</span>
-      </a>
-    </motion.div>
-  );
-}
-
 export default function App() {
   const reduce = useReducedMotion();
 
-  // Hero drifts and fades as you scroll past it, so the shader is revealed
-  // rather than the whole page sliding as one slab.
   const heroRef = useRef<HTMLElement>(null);
   const { scrollYProgress: heroProgress } = useScroll({
     target: heroRef,
@@ -118,7 +55,6 @@ export default function App() {
   const heroY = useTransform(heroProgress, [0, 1], [0, 120]);
   const heroOpacity = useTransform(heroProgress, [0, 0.7], [1, 0]);
 
-  // Thin progress rail along the top of the viewport.
   const { scrollYProgress: pageProgress } = useScroll();
   const rail = useSpring(pageProgress, { stiffness: 90, damping: 26, restDelta: 0.001 });
 
@@ -132,7 +68,6 @@ export default function App() {
       <motion.div className="progress-rail" style={{ scaleX: rail }} />
 
       <div className="app">
-        {/* ---------------- nav ---------------- */}
         <motion.nav
           className="nav"
           initial={{ opacity: 0, y: -20 }}
@@ -144,14 +79,11 @@ export default function App() {
             {profile.name}
           </a>
           <div className="nav__links">
-            <a href="#about" data-cursor="hover">
-              About
+            <a href={profile.github} target="_blank" rel="noreferrer" data-cursor="hover">
+              GitHub
             </a>
-            <a href="#work" data-cursor="hover">
-              Work
-            </a>
-            <a href="#contact" data-cursor="hover">
-              Contact
+            <a href={`mailto:${profile.email}`} data-cursor="hover">
+              Email
             </a>
           </div>
         </motion.nav>
@@ -190,20 +122,6 @@ export default function App() {
           </motion.p>
 
           <motion.div
-            className="hero__meta"
-            variants={stagger}
-            initial="hidden"
-            animate="show"
-            transition={{ delayChildren: 1.4 }}
-          >
-            {facts.map((f) => (
-              <motion.span key={f.label} variants={reveal}>
-                {f.label} <b>{f.value}</b>
-              </motion.span>
-            ))}
-          </motion.div>
-
-          <motion.div
             className="scrollcue"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -219,58 +137,69 @@ export default function App() {
           </motion.div>
         </motion.header>
 
-        {/* ---------------- about ---------------- */}
+        {/* ---------------- the field ----------------
+            The skills are the content of this section, not a footnote to a
+            paragraph. Move the cursor through them. */}
         <motion.section
-          className="section shell"
-          id="about"
+          className="section shell field-section"
+          id="craft"
           variants={reveal}
           initial="hidden"
           whileInView="show"
           viewport={{ once: true, margin: "-15%" }}
         >
-          <p className="section__label">About</p>
-          <p className="about__text">
-            I&rsquo;m a CS student who likes the parts of software that push back.{" "}
+          <p className="section__label">What I work in</p>
+          <SkillField skills={skills} />
+          <p className="field-note">
+            Move through it.{" "}
             <span className="dim">
-              A compiler backend where the abstraction bottoms out in silicon. A
-              production platform where an authorization bug is worth 11,000 leaked
-              records. The common thread is that you can prove whether it worked.
+              Everything above is something I&rsquo;ve shipped with, not something
+              I&rsquo;ve read about.
             </span>
           </p>
-
-          <motion.div
-            className="about__grid"
-            variants={stagger}
-            initial="hidden"
-            whileInView="show"
-            viewport={{ once: true, margin: "-10%" }}
-          >
-            {stack.map((s) => (
-              <motion.span key={s} className="chip" variants={reveal} data-cursor="hover">
-                {s}
-              </motion.span>
-            ))}
-          </motion.div>
         </motion.section>
 
-        {/* ---------------- work ---------------- */}
-        <section className="section shell" id="work">
-          <motion.p
-            className="section__label"
-            variants={reveal}
-            initial="hidden"
-            whileInView="show"
-            viewport={{ once: true }}
-          >
-            Selected Work
-          </motion.p>
+        {/* ---------------- one artifact ----------------
+            One thing, deeply, with a URL you can click. The rest is on GitHub. */}
+        <motion.section
+          className="section shell artifact"
+          id="work"
+          variants={reveal}
+          initial="hidden"
+          whileInView="show"
+          viewport={{ once: true, margin: "-15%" }}
+        >
+          <p className="section__label">Currently proudest of</p>
 
-          <div className="work__list">
-            {projects.map((p) => (
-              <ProjectRow key={p.index} p={p} />
-            ))}
-          </div>
-        </section>
+          <a
+            className="artifact__card"
+            href={flagship.live}
+            target="_blank"
+            rel="noreferrer"
+            data-cursor="hover"
+          >
+            <div className="artifact__head">
+              <h2 className="artifact__title">{flagship.title}</h2>
+              <span className="artifact__live">Live</span>
+            </div>
+            <p className="artifact__blurb">{flagship.blurb}</p>
+            <div className="artifact__stack">
+              {flagship.stack.map((s) => (
+                <span key={s}>{s}</span>
+              ))}
+            </div>
+            <span className="artifact__cta">Open it &rarr;</span>
+          </a>
+
+          <p className="artifact__aside">
+            There&rsquo;s more on{" "}
+            <a href={profile.github} target="_blank" rel="noreferrer" data-cursor="hover">
+              GitHub
+            </a>{" "}
+            &mdash; a compiler backend, a Unity game, some smaller things.{" "}
+            <span className="dim">I&rsquo;d rather show you one that works.</span>
+          </p>
+        </motion.section>
 
         {/* ---------------- contact ---------------- */}
         <motion.section
@@ -281,9 +210,6 @@ export default function App() {
           whileInView="show"
           viewport={{ once: true, margin: "-15%" }}
         >
-          <p className="section__label" style={{ justifyContent: "center" }}>
-            Contact
-          </p>
           <h2 className="contact__big">
             Looking for a{" "}
             <a href={`mailto:${profile.email}`} data-cursor="hover">
@@ -304,10 +230,9 @@ export default function App() {
           </div>
         </motion.section>
 
-        {/* ---------------- footer ---------------- */}
         <footer className="footer">
           <span>&copy; 2026 {profile.name}</span>
-          <span>Built with React &middot; WebGL &middot; Motion</span>
+          <span>WebGL &middot; no template</span>
         </footer>
       </div>
     </>
