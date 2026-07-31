@@ -763,3 +763,130 @@
     animation: none;
   }
 }
+
+/* ---------------------------------------------------------------------------
+   Pinned scenes
+
+   Each section is a tall runway (.stage) with a sticky full-viewport frame
+   (.stage__pin). The scene inside holds still while its runway scrolls by -
+   the section "locks", its animation scrubs with progress, then releases.
+   --------------------------------------------------------------------------- */
+
+.stage {
+  position: relative;
+}
+
+.stage__pin {
+  position: sticky;
+  top: 0;
+  height: 100svh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  overflow: hidden;
+}
+
+/* sections inside a pin get their vertical rhythm from the pin, not padding */
+.stage__pin .hero {
+  min-height: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+.stage__pin .section {
+  padding-top: 0;
+  padding-bottom: 0;
+}
+.stage__pin .field-section {
+  padding-block: 0;
+}
+
+/* ---------------------------------------------------------------------------
+   Bits: shine, gradient ink, contact headline, card spotlight
+   --------------------------------------------------------------------------- */
+
+/* light band sweeping across text */
+.shiny {
+  display: inline-block;
+  color: inherit;
+  background-image: linear-gradient(
+    115deg,
+    transparent 38%,
+    rgba(255, 255, 255, 0.85) 50%,
+    transparent 62%
+  );
+  background-size: 220% 100%;
+  background-position: 130% 0;
+  background-repeat: no-repeat;
+  -webkit-background-clip: text;
+  background-clip: text;
+  animation: shine 3.4s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+@keyframes shine {
+  0% { background-position: 130% 0; }
+  55% { background-position: -60% 0; }
+  100% { background-position: -60% 0; }
+}
+
+/* the hero em: ink into vermilion, drifting slowly */
+.grad-ink {
+  background-image: linear-gradient(
+    100deg,
+    var(--accent) 0%,
+    #e0703f 28%,
+    var(--ink) 62%,
+    var(--accent) 100%
+  );
+  background-size: 240% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  animation: grad-drift 9s ease-in-out infinite alternate;
+}
+@keyframes grad-drift {
+  from { background-position: 0% 0; }
+  to { background-position: 100% 0; }
+}
+
+/* contact headline scale */
+.contact__title {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: clamp(3.4rem, 9vw, 7rem);
+  line-height: 1;
+  margin-bottom: 3rem;
+}
+
+/* pointer-following highlight on the artifact card */
+.spotlight {
+  position: relative;
+}
+.spotlight::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.4s ease;
+  background: radial-gradient(
+    420px circle at var(--mx, 50%) var(--my, 50%),
+    rgb(var(--accent-rgb) / 0.09),
+    transparent 65%
+  );
+}
+.spotlight:hover::before {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shiny,
+  .grad-ink {
+    animation: none;
+  }
+  .grad-ink {
+    -webkit-text-fill-color: initial;
+    color: var(--accent);
+    background: none;
+  }
+}

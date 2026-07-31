@@ -1,4 +1,5 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { MotionValue } from "motion/react";
 import { Canvas, useFrame, useThree, type ThreeEvent } from "@react-three/fiber";
 import { ContactShadows, Html } from "@react-three/drei";
 import * as THREE from "three";
@@ -372,8 +373,34 @@ function FitCamera({ width, depth }: { width: number; depth: number }) {
    Board
    --------------------------------------------------------------------------- */
 
-function Board({ onHover }: { onHover: (label: string | null) => void }) {
+function Board({
+  onHover,
+  progress,
+}: {
+  onHover: (label: string | null) => void;
+  /** Scroll progress of the pinned section. Drives the product lift: the
+   *  board starts lying low like it is on a desk and rises into the hero
+   *  pose. Undefined means "just hold the final pose". */
+  progress?: MotionValue<number>;
+}) {
   const { placed, width, depth } = useMemo(buildLayout, []);
+  const lift = useRef(progress ? 0 : 1);
+  const boardGroup = useRef<THREE.Group>(null);
+
+  useFrame((_, dt) => {
+    const g = boardGroup.current;
+    if (!g) return;
+    const target = progress ? THREE.MathUtils.clamp(progress.get() / 0.72, 0, 1) : 1;
+    const step = 1 - Math.pow(0.0002, Math.min(dt, 0.1));
+    lift.current += (target - lift.current) * step;
+    // ease the tail so the settle is gentle
+    const u = 1 - Math.pow(1 - lift.current, 2.2);
+    g.rotation.x = THREE.MathUtils.lerp(0.72, BASE_TILT, u);
+    g.rotation.y = THREE.MathUtils.lerp(0.34, YAW, u);
+    g.position.y = THREE.MathUtils.lerp(-1.5, 0, u);
+    const sc = THREE.MathUtils.lerp(0.82, 1, u);
+    g.scale.setScalar(sc);
+  });
   const [active, setActive] = useState<string | null>(null);
 
   // Text legends need the webfont, which is very likely still loading on first
@@ -489,7 +516,13 @@ function Board({ onHover }: { onHover: (label: string | null) => void }) {
    Canvas
    --------------------------------------------------------------------------- */
 
-export default function Keyboard3D({ paused = false }: { paused?: boolean }) {
+export default function Keyboard3D({
+  paused = false,
+  progress,
+}: {
+  paused?: boolean;
+  progress?: MotionValue<number>;
+}) {
   const [label, setLabel] = useState<string | null>(null);
 
   return (
@@ -525,7 +558,7 @@ export default function Keyboard3D({ paused = false }: { paused?: boolean }) {
         <directionalLight position={[7, 5, -4]} intensity={1.15} color="#cfe0ff" />
         <directionalLight position={[0, 1.5, 9]} intensity={0.75} color="#ffffff" />
 
-        <Board onHover={setLabel} />
+        <Board onHover={setLabel} progress={progress} />
       </Canvas>
 
       <p className="kb__caption" aria-live="polite">
