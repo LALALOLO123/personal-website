@@ -210,13 +210,6 @@ export default function App() {
           whileInView="show"
           viewport={{ once: true, margin: "-15%" }}
         >
-          <h2 className="contact__big">
-            Looking for a{" "}
-            <a href={`mailto:${profile.email}`} data-cursor="hover">
-              Summer 2027 internship
-            </a>
-            .
-          </h2>
           <div className="contact__links">
             <a href={`mailto:${profile.email}`} data-cursor="hover">
               Email
