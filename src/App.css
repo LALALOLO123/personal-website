@@ -628,8 +628,8 @@
      the canvas occupy exactly the same box and nothing shifts on swap. The
      ratio matches the board's own on-screen proportions at this camera angle,
      so the fit solver is not left with dead space above and below. */
-  aspect-ratio: 16 / 7;
-  max-height: 60vh;
+  aspect-ratio: 16 / 9;
+  max-height: 66vh;
   touch-action: pan-y;
 }
 
@@ -889,4 +889,23 @@
     color: var(--accent);
     background: none;
   }
+}
+
+
+/* The keyboard scene lives in a black studio void now (reference-photo look).
+   Flipping the ink vars keeps every child (label, note, caption) legible. */
+.stage__pin--void {
+  /* void + the spotlight cone from the reference: soft overhead glow,
+     faint floor bounce at the bottom */
+  background:
+    radial-gradient(42% 58% at 50% -10%, rgba(238, 240, 245, 0.17), transparent 64%),
+    radial-gradient(48% 20% at 50% 102%, rgba(214, 218, 226, 0.05), transparent 72%),
+    #050505;
+  --ink: #ece9e2;
+  --ink-dim: #8f8b82;
+  --line: rgba(236, 233, 226, 0.14);
+}
+.stage__pin--void .kb-label {
+  background: #f1efe9;
+  color: #16150f;
 }

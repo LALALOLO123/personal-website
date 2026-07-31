@@ -28,10 +28,12 @@ const ease = [0.16, 1, 0.3, 1] as const;
 function Pinned({
   vh,
   id,
+  pinClass,
   children,
 }: {
   vh: number;
   id?: string;
+  pinClass?: string;
   children: (progress: MotionValue<number>) => ReactNode;
 }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -41,7 +43,7 @@ function Pinned({
   });
   return (
     <div ref={ref} id={id} className="stage" style={{ height: `${vh}vh` }}>
-      <div className="stage__pin">{children(scrollYProgress)}</div>
+      <div className={`stage__pin ${pinClass ?? ""}`}>{children(scrollYProgress)}</div>
     </div>
   );
 }
@@ -295,7 +297,7 @@ export default function App() {
         </Pinned>
 
         {/* Scene 2: the keyboard lifts into its product pose, then releases. */}
-        <Pinned vh={260} id="craft">
+        <Pinned vh={260} id="craft" pinClass="stage__pin--void">
           {(p) => <KeyboardScene progress={p} />}
         </Pinned>
 

@@ -1,7 +1,7 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { MotionValue } from "motion/react";
 import { Canvas, useFrame, useThree, type ThreeEvent } from "@react-three/fiber";
-import { ContactShadows, Html } from "@react-three/drei";
+import { Html } from "@react-three/drei";
 import * as THREE from "three";
 import { RoundedBoxGeometry } from "three-stdlib";
 import { LEGENDS } from "../data/legends";
@@ -46,8 +46,9 @@ const CAP_H = 0.54;
 const ROW_LIFT = [0.34, 0.22, 0.17, 0.22];
 const ROW_TILT = [-0.17, -0.07, 0.02, 0.12];
 
-const BASE_TILT = 0.07; // back edge raised, like a board sitting on its feet
-const YAW = -0.42; // three-quarter product angle, per the Apple treatment
+/* The product pose from Brian's reference photo: board stood nearly on its
+   corner, face toward camera, long axis running lower-right to upper-left. */
+const POSE = { x: 1.08, y: 0.3, z: -0.92 };
 
 type Placed = Cap & { x: number; z: number; row: number; capW: number };
 
@@ -219,10 +220,27 @@ function legendTexture(cap: Cap): THREE.CanvasTexture | null {
    A single key
    --------------------------------------------------------------------------- */
 
-const CAP_COLOR = "#26262c";
-const CAP_HOVER = new THREE.Color("#3a3a44");
+/* Colourway. "white" is the post-black-section variant from the hero video
+   plan: clean glossy white like the BRIAN FU street letters. */
+const KB_VARIANT: "dark" | "white" = "white";
+
+const DARKWAY = { cap: "#26262c", hover: "#3a3a44", mute: "#d5d1c8", case: "#17171c", plate: "#0d0d11", capRough: 0.58, capMetal: 0.14 };
+const WHITEWAY = { cap: "#f1efe9", hover: "#ffffff", mute: "#7a766c", case: "#e6e3dc", plate: "#cfccc4", capRough: 0.3, capMetal: 0.05 };
+const WAY = KB_VARIANT === "white" ? WHITEWAY : DARKWAY;
+
+const CAP_COLOR = WAY.cap;
+const CAP_HOVER = new THREE.Color(WAY.hover);
 const CAP_REST = new THREE.Color(CAP_COLOR);
-const LEGEND_MUTE = new THREE.Color("#d5d1c8");
+const LEGEND_MUTE = new THREE.Color(WAY.mute);
+
+/** On white caps, near-white brand marks (Unity, Deno, Next.js, OpenJDK)
+ *  would vanish; pull any too-light legend down to ink. */
+function legibleHex(hex: string): string {
+  if (KB_VARIANT !== "white") return hex;
+  const c = new THREE.Color(hex);
+  const lum = 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b;
+  return lum > 0.62 ? "#26262c" : hex;
+}
 
 type KeyProps = {
   cap: Placed;
@@ -244,7 +262,7 @@ const Key = memo(function Key({ cap, geometry, texture, active, onEnter, onLeave
   // Resting legends sit slightly back from full saturation so the board reads
   // as one object; hovering brings the mark to its true brand colour.
   const [rest, brand] = useMemo(() => {
-    const b = new THREE.Color(cap.blank ? "#9a958a" : LEGENDS[cap.label]?.hex ?? "#d5d1c8");
+    const b = new THREE.Color(legibleHex(cap.blank ? (KB_VARIANT === "white" ? "#8a8578" : "#9a958a") : LEGENDS[cap.label]?.hex ?? "#d5d1c8"));
     return [b.clone().lerp(LEGEND_MUTE, 0.28), b];
   }, [cap.label, cap.blank]);
 
@@ -292,7 +310,7 @@ const Key = memo(function Key({ cap, geometry, texture, active, onEnter, onLeave
         /* Touch has no hover, so a tap has to stand in for one. */
         onPointerDown={enter}
       >
-        <meshStandardMaterial ref={capMat} color={CAP_COLOR} roughness={0.58} metalness={0.14} />
+        <meshStandardMaterial ref={capMat} color={CAP_COLOR} roughness={WAY.capRough} metalness={WAY.capMetal} />
       </mesh>
 
       {texture && (
@@ -329,9 +347,9 @@ function FitCamera({ width, depth }: { width: number; depth: number }) {
     // seen from three-quarters, the front corners sit much closer to the
     // camera than the centre does and blow past the edge of frame. So project
     // the real bounding corners and pull back until the worst one fits.
-    const hw = width / 2 + 0.42; // + the case lip
-    const hd = depth / 2 + 0.42;
-    const rot = new THREE.Euler(BASE_TILT, YAW, 0);
+    const hw = width / 2 + 0.24; // + the case lip
+    const hd = depth / 2 + 0.24;
+    const rot = new THREE.Euler(POSE.x, POSE.y, POSE.z);
     const corners: THREE.Vector3[] = [];
     for (const sx of [-1, 1]) {
       for (const sz of [-1, 1]) {
@@ -341,13 +359,13 @@ function FitCamera({ width, depth }: { width: number; depth: number }) {
       }
     }
 
-    const FILL = 0.97; // fraction of the frame the board should occupy
+    const FILL = 0.99; // fraction of the frame the board should occupy
     const probe = new THREE.Vector3();
     let dist = 8;
 
     for (let i = 0; i < 8; i++) {
       camera.aspect = size.width / Math.max(1, size.height);
-      camera.position.set(dist * 0.16, dist * 0.44, dist * 0.88);
+      camera.position.set(dist * 0.02, -dist * 0.04, dist);
       camera.lookAt(0, 0, 0);
       camera.updateMatrixWorld(true);
       camera.updateProjectionMatrix();
@@ -361,7 +379,7 @@ function FitCamera({ width, depth }: { width: number; depth: number }) {
       dist *= worst / FILL;
     }
 
-    camera.position.set(dist * 0.16, dist * 0.44, dist * 0.88);
+    camera.position.set(dist * 0.02, -dist * 0.04, dist);
     camera.lookAt(0, 0, 0);
     camera.updateProjectionMatrix();
   }, [camera, size.width, size.height, width, depth]);
@@ -395,10 +413,11 @@ function Board({
     lift.current += (target - lift.current) * step;
     // ease the tail so the settle is gentle
     const u = 1 - Math.pow(1 - lift.current, 2.2);
-    g.rotation.x = THREE.MathUtils.lerp(0.72, BASE_TILT, u);
-    g.rotation.y = THREE.MathUtils.lerp(0.34, YAW, u);
-    g.position.y = THREE.MathUtils.lerp(-1.5, 0, u);
-    const sc = THREE.MathUtils.lerp(0.82, 1, u);
+    g.rotation.x = THREE.MathUtils.lerp(0.3, POSE.x, u);
+    g.rotation.y = THREE.MathUtils.lerp(0.05, POSE.y, u);
+    g.rotation.z = THREE.MathUtils.lerp(0, POSE.z, u);
+    g.position.y = THREE.MathUtils.lerp(-2.2, 0, u);
+    const sc = THREE.MathUtils.lerp(0.85, 1, u);
     g.scale.setScalar(sc);
   });
   const [active, setActive] = useState<string | null>(null);
@@ -464,15 +483,15 @@ function Board({
 
       {/* The board is deliberately static. The only thing that moves is the
           key under the pointer. */}
-      <group rotation={[BASE_TILT, 0, 0]} onPointerMissed={clear}>
+      <group ref={boardGroup} rotation={[POSE.x, POSE.y, POSE.z]} onPointerMissed={clear}>
         <mesh geometry={caseGeo} position={[0, -0.16, 0]} castShadow receiveShadow>
-          <meshStandardMaterial color="#17171c" roughness={0.36} metalness={0.8} />
+          <meshStandardMaterial color={WAY.case} roughness={0.36} metalness={KB_VARIANT === "white" ? 0.25 : 0.8} />
         </mesh>
 
         {/* switch plate, visible in the gaps between caps */}
         <mesh position={[0, 0.13, 0]} receiveShadow>
           <boxGeometry args={[width + 0.34, 0.06, depth + 0.34]} />
-          <meshStandardMaterial color="#0d0d11" roughness={0.9} metalness={0.2} />
+          <meshStandardMaterial color={WAY.plate} roughness={0.9} metalness={0.2} />
         </mesh>
 
         {placed.map((cap) => (
@@ -498,15 +517,6 @@ function Board({
           </Html>
         )}
 
-        <ContactShadows
-          position={[0, -0.5, 0]}
-          opacity={0.3}
-          scale={width + 2}
-          blur={4.2}
-          far={2.2}
-          resolution={512}
-          color="#2a2622"
-        />
       </group>
     </>
   );
@@ -539,24 +549,31 @@ export default function Keyboard3D({
           gl.toneMappingExposure = 1.25;
         }}
       >
-        {/* Studio setup for a dark object on light paper: strong key from the
-            upper left, cool fill from the right, and a low front bounce so the
-            near edge of the case does not go solid black. */}
-        <ambientLight intensity={1.15} color="#fffaf2" />
-        <directionalLight
-          position={[-5, 8, 5.5]}
-          intensity={2.6}
-          color="#fff4e2"
+        {/* Black studio from the reference photo. The void and the visible
+            light cone are painted by the section CSS behind this transparent
+            canvas; the scene contributes the lit board, floor pool, shadow. */}
+        <ambientLight intensity={0.34} color="#dfe3ea" />
+        <spotLight
+          position={[0.5, 14, 4]}
+          angle={0.4}
+          penumbra={0.85}
+          intensity={560}
+          decay={1.6}
+          color="#f4f2ee"
           castShadow
-          shadow-mapSize={[1024, 1024]}
-          shadow-camera-left={-9}
-          shadow-camera-right={9}
-          shadow-camera-top={9}
-          shadow-camera-bottom={-9}
-          shadow-bias={-0.0015}
+          shadow-mapSize={[2048, 2048]}
+          shadow-bias={-0.0012}
         />
-        <directionalLight position={[7, 5, -4]} intensity={1.15} color="#cfe0ff" />
-        <directionalLight position={[0, 1.5, 9]} intensity={0.75} color="#ffffff" />
+        {/* soft frontal fill so cap sides do not fall to black */}
+        <directionalLight position={[0, 1, 10]} intensity={0.55} color="#cdd3dc" />
+        {/* faint cool rim from upper left, like the reference */}
+        <directionalLight position={[-6, 8, -3]} intensity={0.7} color="#aebacc" />
+
+        {/* the floor, far enough below that the board floats */}
+        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -4.6, 0]} receiveShadow>
+          <planeGeometry args={[80, 80]} />
+          <meshStandardMaterial color="#1d1d1f" roughness={0.92} metalness={0.05} />
+        </mesh>
 
         <Board onHover={setLabel} progress={progress} />
       </Canvas>
