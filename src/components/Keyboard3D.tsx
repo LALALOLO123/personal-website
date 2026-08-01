@@ -56,9 +56,13 @@ const ROW_TILT = [0, 0, 0, 0];
    LONG SIDE VERTICAL with a slight lean, face toward the camera. Composed in
    world space - first tip the face to the camera, then roll around the view
    axis - so the angles mean what they say. */
+const POSE_TIP = 1.32; // about X: tips the face up toward the camera
+const POSE_ROLL = -(Math.PI / 2 - 0.46); // about Z: stands it on its corner
+const POSE_YAW = -0.3; // about Y: swings the right edge toward the viewer
 const FINAL_Q = new THREE.Quaternion()
-  .setFromAxisAngle(new THREE.Vector3(0, 0, 1), -(Math.PI / 2 - 0.32))
-  .multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), 1.32));
+  .setFromAxisAngle(new THREE.Vector3(0, 1, 0), POSE_YAW)
+  .multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), POSE_ROLL))
+  .multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), POSE_TIP));
 const FLAT_Q = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), 0.62);
 /** Where the board rests before it stands up: inside the spotlight, fully in
  *  frame, tipped enough that you can read it as a keyboard. */
