@@ -155,28 +155,33 @@ function WorkSection({ active }: { active: boolean }) {
 
   return (
     <div className="section shell artifact">
-      <motion.p className="section__label" variants={rise} initial="hidden" animate={state} custom={0}>
+      {!usePlate && (
+        <motion.p className="section__label" variants={rise} initial="hidden" animate={state} custom={0}>
         Selected work
       </motion.p>
+      )}
 
       <Suspense fallback={null}>
         {usePlate ? <WorkPlate onSelect={setShown} /> : <WorkScene onSelect={setShown} />}
       </Suspense>
 
-      {/* the reel notes, out of the way of the beam */}
-      <div className="reelnote">
-        <p className="reelnote__meta">{shown?.years}</p>
-        <p className="reelnote__blurb">{shown?.blurb}</p>
-        <p className="reelnote__stack">{shown?.stack?.join("  ·  ")}</p>
-      </div>
+      {!usePlate && (
+        <div className="reelnote">
+          <p className="reelnote__meta">{shown?.years}</p>
+          <p className="reelnote__blurb">{shown?.blurb}</p>
+          <p className="reelnote__stack">{shown?.stack?.join("  ·  ")}</p>
+        </div>
+      )}
 
-      <motion.p className="artifact__aside" variants={rise} initial="hidden" animate={state} custom={3}>
+      {!usePlate && (
+        <motion.p className="artifact__aside" variants={rise} initial="hidden" animate={state} custom={3}>
         All of it is on{" "}
         <a href={profile.github} target="_blank" rel="noreferrer" data-cursor="hover">
           GitHub
         </a>
         . <span className="dim">I&rsquo;d rather show you one that works.</span>
       </motion.p>
+      )}
     </div>
   );
 }

@@ -39,15 +39,17 @@ const PLATE_AR = 16 / 9;
  * The plate supplies only what a model is genuinely better at than us - the
  * plane, the sky, the trees, the machine. */
 const SCREEN_QUAD: Quad = [
-  { x: 0.215, y: 0.135 },
-  { x: 0.735, y: 0.115 },
-  { x: 0.742, y: 0.605 },
-  { x: 0.222, y: 0.625 },
+  { x: 0.272, y: 0.082 },
+  { x: 0.719, y: 0.066 },
+  { x: 0.726, y: 0.678 },
+  { x: 0.279, y: 0.694 },
 ];
 
-/** The overlay's own pixel space, before it gets warped. */
+/** The overlay's own pixel width, before it gets warped. Its HEIGHT is
+ *  derived from the quad below, never fixed: if the two aspects disagree the
+ *  homography silently stretches everything inside, which is what was
+ *  squashing the caption up into the reel. */
 const CONTENT_W = 1280;
-const CONTENT_H = 720;
 
 type Item = {
   title: string;
@@ -80,11 +82,34 @@ export default function WorkPlate({ onSelect }: { onSelect: (i: Item) => void })
     return () => ro.disconnect();
   }, []);
 
+  /* The plate is full bleed and object-fit: cover, so what is on screen is a
+     CROP of it - the visible region is not the container. The quad is stored
+     in the image's own space, so it has to be mapped through the same crop or
+     the panel drifts off the composition at every aspect ratio but one. */
+  const view = useMemo(() => {
+    if (!box.w || !box.h) return null;
+    const scale = Math.max(box.w / PLATE_AR, box.h);
+    const w = PLATE_AR * scale;
+    const h = scale;
+    return { x: (box.w - w) / 2, y: (box.h - h) / 2, w, h };
+  }, [box]);
+
+  /* Match the pre-warp box to the quad's own proportions, averaging opposite
+     edges so a slightly trapezoidal screen still gets a sane ratio. */
+  const contentH = useMemo(() => {
+    const w = (((quad[1].x - quad[0].x) + (quad[2].x - quad[3].x)) / 2) * PLATE_AR;
+    const h = ((quad[3].y - quad[0].y) + (quad[2].y - quad[1].y)) / 2;
+    return Math.max(360, Math.round(CONTENT_W / (w / h)));
+  }, [quad]);
+
   const transform = useMemo(() => {
-    if (!box.w || !box.h) return undefined;
-    const px = quad.map((p) => ({ x: p.x * box.w, y: p.y * box.h })) as Quad;
-    return cornerPin(CONTENT_W, CONTENT_H, px) ?? undefined;
-  }, [box, quad]);
+    if (!view) return undefined;
+    const px = quad.map((p) => ({
+      x: view.x + p.x * view.w,
+      y: view.y + p.y * view.h,
+    })) as Quad;
+    return cornerPin(CONTENT_W, contentH, px) ?? undefined;
+  }, [view, quad, contentH]);
 
   const item = items[loaded];
   const reel = item.reel.clip ?? item.reel.still;
@@ -135,22 +160,53 @@ export default function WorkPlate({ onSelect }: { onSelect: (i: Item) => void })
             on a surface instead of a sticker. */}
         <div
           className="plate__screen"
-          style={{ width: CONTENT_W, height: CONTENT_H, transform }}
+          style={{ width: CONTENT_W, height: contentH, transform }}
         >
           <div className="plate__halo" aria-hidden="true" />
-          <div className="plate__reel" key={item.title}>
-            {reel ? (
-              item.reel.clip ? (
-                <video src={item.reel.clip} autoPlay muted loop playsInline />
+
+          {/* One window, holding everything. The names, the reel and the
+              caption all live inside the thing floating in the scene - a
+              strip of copy stuck to the side of the page would be the
+              website talking over its own environment. */}
+          <div className="plate__win">
+            <div className="plate__tabs">
+              {items.map((it, i) => (
+                <button
+                  key={it.title}
+                  className={i === loaded ? "is-on" : ""}
+                  onClick={() => {
+                    if (i === loaded) return;
+                    setLoaded(i);
+                    playStageLight();
+                  }}
+                >
+                  {it.title}
+                </button>
+              ))}
+            </div>
+
+            <div className="plate__reel" key={item.title}>
+              {reel ? (
+                item.reel.clip ? (
+                  <video src={item.reel.clip} autoPlay muted loop playsInline />
+                ) : (
+                  <img src={reel} alt="" />
+                )
               ) : (
-                <img src={reel} alt="" />
-              )
-            ) : (
-              <div className="plate__leader">
-                <span>{item.title}</span>
-                <small>REEL NOT LOADED</small>
-              </div>
-            )}
+                <div className="plate__leader">
+                  <span>{item.title}</span>
+                  <small>REEL NOT LOADED</small>
+                </div>
+              )}
+            </div>
+
+            <div className="plate__caption">
+              <p>{item.blurb}</p>
+              <span>
+                {item.years ? item.years + "   ·   " : ""}
+                {item.stack.join("  ·  ")}
+              </span>
+            </div>
           </div>
         </div>
 
@@ -178,25 +234,6 @@ export default function WorkPlate({ onSelect }: { onSelect: (i: Item) => void })
         )}
       </div>
 
-      {/* selector stays as flat UI: the projector's own little display would
-          be ~60px here and unreadable, and a small steeply-angled surface is
-          the worst case for a homography */}
-      <div className="plate__picker">
-        {items.map((it, i) => (
-          <button
-            key={it.title}
-            className={i === loaded ? "is-on" : ""}
-            data-cursor="hover"
-            onClick={() => {
-              if (i === loaded) return;
-              setLoaded(i);
-              playStageLight();
-            }}
-          >
-            {it.title}
-          </button>
-        ))}
-      </div>
     </div>
   );
 }

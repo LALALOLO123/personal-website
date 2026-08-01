@@ -1154,19 +1154,12 @@ html {
    mode rather than a straight paste, because projected light ADDS to what it
    falls on - a pasted rectangle reads as a sticker every time.
    --------------------------------------------------------------------------- */
-.plate {
+/* Full bleed. The environment IS the section - letterboxing it into a padded
+   box in the middle of the page was the same mistake the keyboard made. */
+.plate,
+.plate__inner {
   position: absolute;
   inset: 0;
-  display: grid;
-  place-items: center;
-  gap: 1.4rem;
-  grid-template-rows: 1fr auto;
-  padding: 7vh min(5vw, 3rem) 9vh;
-}
-.plate__inner {
-  position: relative;
-  width: min(100%, 1500px);
-  max-height: 100%;
   overflow: hidden;
 }
 .plate__img {
@@ -1182,13 +1175,16 @@ html {
   top: 0;
   left: 0;
   transform-origin: 0 0;
-  /* light, not a decal */
-  mix-blend-mode: screen;
   will-change: transform;
+}
+/* Only the reel blends. Running the whole window additive made it look
+   convincingly holographic and completely unreadable. */
+.plate--plane .plate__reel {
+  mix-blend-mode: screen;
 }
 .plate__reel {
   width: 100%;
-  height: 100%;
+  aspect-ratio: 16 / 9;
   overflow: hidden;
   background: #05060a;
   animation: plate-strike 0.5s ease-out both;
@@ -1304,4 +1300,77 @@ html {
     transparent 78%
   );
   filter: blur(14px);
+}
+
+
+/* ---------------------------------------------------------------------------
+   The floating window
+
+   Everything the section has to say lives in here: names, reel, caption. It
+   is one object in the scene rather than a picture with a column of copy
+   parked next to it.
+   --------------------------------------------------------------------------- */
+.plate__win {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  grid-template-rows: auto auto 1fr;
+  background: rgba(8, 10, 22, 0.86);
+  border: 1px solid rgba(170, 200, 255, 0.28);
+  border-radius: 14px;
+  overflow: hidden;
+  backdrop-filter: blur(2px);
+  font-family: var(--font-mono);
+}
+.plate__tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid rgba(170, 200, 255, 0.18);
+}
+.plate__tabs button {
+  flex: 1;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 25px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(214, 226, 255, 0.5);
+  padding: 22px 8px;
+  cursor: pointer;
+  transition: color 0.25s, background 0.25s;
+}
+.plate__tabs button:hover { color: #eaf1ff; }
+.plate__tabs button.is-on {
+  color: #ffffff;
+  background: rgba(150, 190, 255, 0.13);
+  box-shadow: inset 0 -2px 0 rgba(180, 210, 255, 0.9);
+}
+.plate__caption {
+  align-content: start;
+  overflow: hidden;
+  padding: 24px 30px 26px;
+  border-top: 1px solid rgba(170, 200, 255, 0.18);
+  display: grid;
+  gap: 10px;
+}
+/* The window is a fixed size, so the copy has to fit it rather than the other
+   way round - CarScout's blurb is three times the length of the others and
+   was spilling up over the reel. */
+.plate__caption p {
+  margin: 0;
+  font-size: 24px;
+  line-height: 1.5;
+  color: rgba(228, 236, 255, 0.92);
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.plate__caption span {
+  font-size: 19px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgba(170, 195, 240, 0.65);
 }
