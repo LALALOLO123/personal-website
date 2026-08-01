@@ -24,6 +24,8 @@ const MAP = [
   ["Bash",                "gnubash"],
   ["Git",                 "git"],
   ["CI/CD",               "githubactions"],
+  // bottom-row function keys
+  ["GitHub",              "github"],
 ];
 
 // Simple Icons carries no Amazon marks, so these two are drawn by hand:
@@ -44,6 +46,9 @@ const CUSTOM = {
 
 // No mark exists (or the mark is a wordmark), so these are legends.
 const TEXT = {
+  "Email": "E8C37E",
+  "LinkedIn": "7FB3E8",
+  "Sound": "9CC0E7",
   "C#": "F5A97F",
   GLSL: "9CC0E7",
   WebGL: "E06060",
@@ -52,6 +57,9 @@ const TEXT = {
   "Row-Level Security": "8FD3B6",
 };
 const TEXT_LEGEND = {
+  "Email": "@",
+  "LinkedIn": "in",
+  "Sound": "VOL",
   "C#": "C#",
   GLSL: "GLSL",
   WebGL: "WebGL",

@@ -6,6 +6,8 @@ import * as THREE from "three";
 import { RoundedBoxGeometry } from "three-stdlib";
 import { LEGENDS } from "../data/legends";
 import { useKeycapGeometry, capGeometry, HEIGHT_RATIO } from "../data/keycapGeometry";
+import { legendGeometry } from "../data/legendGeometry";
+import { playPress, playRelease, toggleSound } from "../data/keySound";
 
 /* ---------------------------------------------------------------------------
    Layout
@@ -16,7 +18,8 @@ import { useKeycapGeometry, capGeometry, HEIGHT_RATIO } from "../data/keycapGeom
    and tooling recedes to the back.
    --------------------------------------------------------------------------- */
 
-type Cap = { label: string; w: number; blank?: boolean };
+type CapAction = "github" | "email" | "linkedin" | "sound" | "wave";
+type Cap = { label: string; w: number; blank?: boolean; action?: CapAction };
 
 const k = (label: string): Cap => ({ label, w: 1 });
 
@@ -27,7 +30,15 @@ const ROWS: { caps: Cap[] }[] = [
   { caps: [k("Vite"), k("Next.js"), k("Bash"), k("Git"), k("CI/CD"), k("Docker"), k("LLVM"), { label: "GLSL", w: 1.5 }, { label: "WebGL", w: 1.5 }] },
   { caps: [{ label: "C#", w: 1.5 }, k("Node"), k("Deno"), k("Java"), k("Unity"), k("TypeScript"), k("Python"), k("C++"), { label: "SQL", w: 1.5 }] },
   { caps: [{ label: "REST APIs", w: 1.75 }, k("React"), k("FastAPI"), k("PostgreSQL"), k("Supabase"), k("AWS Lambda"), k("DynamoDB"), { label: "Row-Level Security", w: 2.25 }] },
-  { caps: [{ label: "", w: 1.25, blank: true }, { label: "", w: 1.25, blank: true }, { label: "shipped, not read about", w: 5, blank: true }, { label: "", w: 1.25, blank: true }, { label: "", w: 1.25, blank: true }] },
+  {
+    caps: [
+      { label: "GitHub", w: 1.25, action: "github" },
+      { label: "Email", w: 1.25, action: "email" },
+      { label: "shipped, not read about", w: 5, blank: true, action: "wave" },
+      { label: "Sound", w: 1.25, action: "sound" },
+      { label: "LinkedIn", w: 1.25, action: "linkedin" },
+    ],
+  },
 ];
 
 const U = 1.0; // one key unit
@@ -53,6 +64,9 @@ const FLAT_Q = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0
 /* Everything the whole board shares per frame; Key legends read the lamp so
    the unlit logo materials cannot glow before the spotlight is on. */
 const STAGE = { lamp: 1 };
+
+/** Timestamp of the last spacebar hit; every key ripples off it. */
+const WAVE = { at: 0 };
 
 type Placed = Cap & { x: number; z: number; row: number; capW: number };
 
@@ -232,9 +246,12 @@ type KeyProps = {
   active: boolean;
   onEnter: (label: string) => void;
   onLeave: (label: string) => void;
+  onAction: (a: CapAction) => void;
+  /** Ripple offset in seconds; the wave easter egg staggers by column. */
+  waveAt: number;
 };
 
-const Key = memo(function Key({ cap, geometry, texture, active, onEnter, onLeave }: KeyProps) {
+const Key = memo(function Key({ cap, geometry, texture, active, onEnter, onLeave, onAction, waveAt }: KeyProps) {
   const group = useRef<THREE.Group>(null);
   const capMat = useRef<THREE.MeshStandardMaterial>(null);
   const legendMat = useRef<THREE.MeshBasicMaterial>(null);
@@ -262,7 +279,16 @@ const Key = memo(function Key({ cap, geometry, texture, active, onEnter, onLeave
     press.current += ((active ? 1 : 0) - press.current) * step;
     const p = press.current;
 
-    if (group.current) group.current.position.y = baseY - p * TRAVEL;
+    // hover press + the ripple, so a key can ride both at once
+    let sink = p * TRAVEL;
+    if (WAVE.at > 0) {
+      const since = performance.now() / 1000 - WAVE.at - waveAt;
+      if (since > 0 && since < 0.5) {
+        // deep enough to read as a wave rolling across the board
+        sink += Math.sin((since / 0.5) * Math.PI) * TRAVEL * 2.4;
+      }
+    }
+    if (group.current) group.current.position.y = baseY - sink;
     if (legendMat.current) {
       legendMat.current.color.lerpColors(rest, brand, p);
       legendMat.current.color.multiplyScalar(STAGE.lamp);
@@ -273,6 +299,7 @@ const Key = memo(function Key({ cap, geometry, texture, active, onEnter, onLeave
   const enter = useCallback(
     (e: ThreeEvent<PointerEvent>) => {
       e.stopPropagation();
+      playPress();
       onEnter(cap.label);
     },
     [cap.label, onEnter]
@@ -280,15 +307,27 @@ const Key = memo(function Key({ cap, geometry, texture, active, onEnter, onLeave
   const leave = useCallback(
     (e: ThreeEvent<PointerEvent>) => {
       e.stopPropagation();
+      playRelease();
       onLeave(cap.label);
     },
     [cap.label, onLeave]
+  );
+  const click = useCallback(
+    (e: ThreeEvent<MouseEvent>) => {
+      if (!cap.action) return;
+      e.stopPropagation();
+      onAction(cap.action);
+    },
+    [cap.action, onAction]
   );
 
   // Sit the legend just clear of the un-dished rim. Floating it above the whole
   // top face rather than tucking it into the scoop means it can never be
   // swallowed by the cap, and 4 thousandths of a unit is invisible at this size.
   const legendY = CAP_H / 2 + 0.004;
+  const vector = cap.blank ? null : legendGeometry(cap.label);
+  // marks sit at a consistent share of the 1u cap regardless of cap width
+  const markSize = BASE * 0.46;
   const legendW = cap.capW * 0.78;
   const legendD = (U - GAP) * 0.7;
 
@@ -298,19 +337,36 @@ const Key = memo(function Key({ cap, geometry, texture, active, onEnter, onLeave
         geometry={geometry}
         scale={BASE}
         castShadow
-        onPointerOver={cap.label ? enter : undefined}
-        onPointerOut={cap.label ? leave : undefined}
+        onPointerOver={enter}
+        onPointerOut={leave}
         /* Touch has no hover, so a tap has to stand in for one. */
-        onPointerDown={cap.label ? enter : undefined}
+        onPointerDown={enter}
+        onClick={cap.action ? click : undefined}
       >
         <meshStandardMaterial ref={capMat} color={CAP_COLOR} roughness={WAY.capRough} metalness={WAY.capMetal} />
       </mesh>
 
-      {texture && (
+      {/* Vector mark: real geometry, sharp at any zoom (his approach). */}
+      {vector && (
+        <mesh
+          geometry={vector}
+          position={[0, legendY, 0]}
+          scale={markSize}
+          renderOrder={2}
+        >
+          <meshBasicMaterial
+            ref={legendMat}
+            side={THREE.DoubleSide}
+            depthWrite={false}
+            toneMapped={false}
+          />
+        </mesh>
+      )}
+
+      {/* Wordmarks and text legends keep the canvas path. */}
+      {!vector && texture && (
         <mesh position={[0, legendY, 0]} rotation={[-Math.PI / 2, 0, 0]} renderOrder={2}>
           <planeGeometry args={[legendW, legendD]} />
-          {/* Unlit on purpose: a printed legend should read at full strength
-              from any angle instead of falling into the cap's own shading. */}
           <meshBasicMaterial
             ref={legendMat}
             map={texture}
@@ -390,6 +446,7 @@ function Board({
   onHover,
   progress,
   onLit,
+  onSound,
 }: {
   onHover: (label: string | null) => void;
   /** Scroll progress of the pinned section. Crossing a small threshold ARMS
@@ -400,8 +457,12 @@ function Board({
   progress?: MotionValue<number>;
   /** Fired the moment the spotlight starts turning on (drives the CSS cone). */
   onLit?: () => void;
+  /** Reports the VOL key's new state so the caption can echo it. */
+  onSound?: (on: boolean) => void;
 }) {
   const { placed, width, depth } = useMemo(buildLayout, []);
+  // leftmost cap edge: the ripple's origin for per-key stagger
+  const originX = useMemo(() => Math.min(...placed.map((c) => c.x)), [placed]);
   const boardGroup = useRef<THREE.Group>(null);
   const spotRef = useRef<THREE.SpotLight>(null);
   const ambRef = useRef<THREE.AmbientLight>(null);
@@ -506,6 +567,26 @@ function Board({
     onHover(null);
   }, [onHover]);
 
+  const runAction = useCallback((a: CapAction) => {
+    switch (a) {
+      case "github":
+        window.open("https://github.com/jiacheng-fu", "_blank", "noopener");
+        break;
+      case "linkedin":
+        window.open("https://linkedin.com/in/jiachengfu", "_blank", "noopener");
+        break;
+      case "email":
+        window.location.href = "mailto:brian.fu123321@gmail.com";
+        break;
+      case "sound":
+        onSound?.(toggleSound());
+        break;
+      case "wave":
+        WAVE.at = performance.now() / 1000;
+        break;
+    }
+  }, [onSound]);
+
   const activeCap = active ? placed.find((p) => p.label === active) : null;
 
   return (
@@ -555,6 +636,8 @@ function Board({
             active={active === cap.label}
             onEnter={enter}
             onLeave={leave}
+            onAction={runAction}
+            waveAt={(cap.x - originX) * 0.06}
           />
         ))}
 
@@ -588,6 +671,7 @@ export default function Keyboard3D({
   onLit?: () => void;
 }) {
   const [label, setLabel] = useState<string | null>(null);
+  const [sound, setSound] = useState(false);
 
   return (
     <div className="kb">
@@ -607,11 +691,11 @@ export default function Keyboard3D({
             light cone are painted by the section CSS behind this transparent
             canvas; the scene contributes the lit board, floor pool, shadow.
             Lights live inside Board so the switch-on sequence can drive them. */}
-        <Board onHover={setLabel} progress={progress} onLit={onLit} />
+        <Board onHover={setLabel} progress={progress} onLit={onLit} onSound={setSound} />
       </Canvas>
 
       <p className="kb__caption" aria-live="polite">
-        {label ?? "Hover a key."}
+        {label ?? (sound ? "Sound on." : "Hover a key.")}
       </p>
     </div>
   );
