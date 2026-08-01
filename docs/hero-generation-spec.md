@@ -123,6 +123,58 @@ not more attempts — bring the best three back for a decision.
 
 ---
 
+### What actually happened — keyframe ACCEPTED 2026-08-01, 9 drafts, 36 credits
+
+`public/shots/hero-keyframe.jpg` is real now (draft 8, job
+`c68b9289-0dfa-4e6a-96e8-06efa0dcdc49`). All nine drafts are kept in
+`../../screenshots/hero-drafts/` with `view.cjs` to downscale them for review.
+Four corrections were needed, and every one of them will apply again to the
+video prompts:
+
+1. **The model spells BRAIN, not BRIAN.** Every early draft put the robot in the
+   4th slot, giving `BRA[robot]N`. "BRAIN" is a vastly commoner token. Naming the
+   slot ("in the position of the letter I") is not enough.
+2. **Do not enumerate the letters one by one** — ask for `B, R, A, N, F, U` as a
+   list and the model silently drops one, usually the A.
+   What worked is stating BOTH the whole name AND the removal AND the resulting
+   order: *"a sculpture of the name BRIAN FU. Six of its letters - B, R, A, N, F
+   and U - are... The letter I is NOT a sculpture: standing in the empty letter
+   slot between the R and the A is a bipedal robot. So the row reads, left to
+   right: B, R, robot, A, N, then a word space, then F, U."*
+3. **The street must run ACROSS the frame, not away from it** (Brian, 2026-08-01).
+   Every draft defaulted to a vanishing point straight down the road. That is
+   fatal, not cosmetic: the van has to cross right-to-left, and it cannot do that
+   on a road pointing at the lens. Say the camera stands on one sidewalk facing
+   the opposite facade, that the road runs left edge to right edge, and that
+   there is no vanishing point.
+4. **"Industrial humanoid robot" yields a sci-fi android.** Brian: "full boston
+   dynamics vibe". What worked was describing an *engineering prototype*: matte
+   dark grey and black panels over an exposed aluminium frame, visible hydraulic
+   actuators at hips/knees/shoulders/elbows, bundled cable looms, hex bolts, a
+   battery pack, and critically **a head that is not a face** — a flat sensor
+   housing with a lidar puck and a stereo camera bar, no eyes, no mouth. Plus
+   explicit negatives: no chrome, no glowing lights, no white armour, no visor,
+   no helmet, and **no wheels/cart/trolley/base plate** (one draft came back as a
+   legless rig on a trolley).
+
+Reuse the accepted keyframe's full prompt verbatim for assets 2-5; it is stored
+in the job record and in `screenshots/hero-drafts/`.
+
+**Two things were accepted as-is and are worth knowing:** the robot stands
+somewhat taller than the letters rather than exactly level (repeated instruction
+never fixed it, and it reads fine), and the row spans ~75% of frame width rather
+than the 55% asked for, so the 9:16 centre-crop is tighter than planned — verify
+mobile before shipping. The web copy is 2560px/700KB, which is heavy for a hero
+and should be recompressed once ffmpeg-static is in.
+
+**Billing quirks found the hard way:** `count: 4` in one call silently submits
+only 1-2 jobs and reports "ran out of credits" when the balance is fine —
+**send separate `count: 1` calls**. Also `list_workspaces` showed
+`is_selected: false`; call `select_workspace` first. Real price is **4 credits
+per 4k image**, not per batch.
+
+---
+
 ## 3 · Asset 2 — Empty street
 
 **Model:** `nano_banana_pro`, passing the accepted keyframe as a reference
