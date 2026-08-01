@@ -6,6 +6,11 @@ const fs = require("fs");
 // inventing a logo that doesn't exist.
 const MAP = [
   ["TypeScript",          "typescript"],
+  ["JavaScript",          "javascript"],
+  ["Haskell",             "haskell"],
+  ["HTML",                "html5"],
+  ["CSS",                 "css"],
+  ["Vercel",              "vercel"],
   ["Python",              "python"],
   ["C++",                 "cplusplus"],
   ["React",               "react"],
@@ -24,8 +29,6 @@ const MAP = [
   ["Bash",                "gnubash"],
   ["Git",                 "git"],
   ["CI/CD",               "githubactions"],
-  // GLSL is OpenGL's shading language, so the OpenGL mark is the honest one.
-  ["GLSL",                "opengl"],
   // Its mark is a wordmark - unreadable as a 256px raster, but the legends
   // are vector geometry now, so it renders crisply.
   ["WebGL",               "webgl"],
@@ -37,6 +40,11 @@ const MAP = [
 // a lambda glyph (which is the Lambda mark) and the universal database
 // cylinder (which is what the DynamoDB mark is built on).
 const CUSTOM = {
+  Playwright: {
+    hex: "45BA4B",
+    // a browser window with a passing check - end-to-end testing
+    path: "M21 3H3a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h18a1 1 0 0 0 1-1V4a1 1 0 0 0-1-1zm-1 16H4V9h16v10zM4 7V5h16v2H4zm6.6 9.8l-2.9-2.9 1.4-1.4 1.5 1.5 3.9-3.9 1.4 1.4-5.3 5.3z",
+  },
   "REST APIs": {
     hex: "E8C37E",
     // request out, response back
@@ -74,10 +82,12 @@ const CUSTOM = {
 
 // No mark exists (or the mark is a wordmark), so these are legends.
 const TEXT = {
+  GLSL: "9CC0E7",
   "LinkedIn": "7FB3E8",
   "C#": "F5A97F",
 };
 const TEXT_LEGEND = {
+  GLSL: "GLSL",
   "LinkedIn": "in",
   "C#": "C#",
 };

@@ -20,22 +20,37 @@ import { playPress, playRelease, toggleSound } from "../data/keySound";
 type CapAction = "github" | "email" | "linkedin" | "sound" | "wave";
 type Cap = { label: string; w: number; blank?: boolean; action?: CapAction };
 
-const k = (label: string): Cap => ({ label, w: 1 });
+/* Every row is exactly ROW_W wide and only the two END caps are irregular -
+   they absorb whatever the row needs, the way Tab / Caps / Shift / Enter do on
+   a real board. Nothing in the middle is ever a funny size.
 
-/* A real 60%-style layout: every row sums to exactly 10u so the edges are
-   flush, and the wordmark skills ride the wide modifier caps the way Tab,
-   Caps, and Enter would. Bottom row: blank mods flanking the spacebar. */
+   Rows are grouped by kind: languages, then web and UI, then data and cloud,
+   then systems and graphics, then the function row. Everything here is on
+   Brian's resume or demonstrably in his repos. */
+const ROW_W = 12; // wide enough that 4 rows keep real keyboard proportions
+
+const skillRow = (labels: string[]): Cap[] => {
+  const edge = (ROW_W - (labels.length - 2)) / 2;
+  return labels.map((label, i) => ({
+    label,
+    w: i === 0 || i === labels.length - 1 ? edge : 1,
+  }));
+};
+
 const ROWS: { caps: Cap[] }[] = [
-  { caps: [k("Vite"), k("Next.js"), k("Bash"), k("Git"), k("CI/CD"), k("Docker"), k("LLVM"), { label: "GLSL", w: 1.5 }, { label: "WebGL", w: 1.5 }] },
-  { caps: [{ label: "C#", w: 1.5 }, k("Node"), k("Deno"), k("Java"), k("Unity"), k("TypeScript"), k("Python"), k("C++"), { label: "SQL", w: 1.5 }] },
-  { caps: [{ label: "REST APIs", w: 1.75 }, k("React"), k("FastAPI"), k("PostgreSQL"), k("Supabase"), k("AWS Lambda"), k("DynamoDB"), { label: "Row-Level Security", w: 2.25 }] },
+  // languages, in the order he'd list them
+  { caps: skillRow(["C++", "Java", "Python", "TypeScript", "JavaScript", "C#", "Haskell", "Bash", "SQL", "HTML", "CSS"]) },
+  // the full-stack layer: framework, runtime, API, database
+  { caps: skillRow(["React", "Next.js", "Vite", "Node", "Deno", "FastAPI", "REST APIs", "PostgreSQL", "Supabase", "DynamoDB"]) },
+  // cloud, tooling, systems and graphics
+  { caps: skillRow(["AWS Lambda", "Vercel", "Row-Level Security", "Docker", "Git", "CI/CD", "Playwright", "LLVM", "Unity", "GLSL", "WebGL"]) },
   {
     caps: [
-      { label: "GitHub", w: 1.25, action: "github" },
-      { label: "Email", w: 1.25, action: "email" },
-      { label: "shipped, not read about", w: 5, blank: true, action: "wave" },
-      { label: "Sound", w: 1.25, action: "sound" },
-      { label: "LinkedIn", w: 1.25, action: "linkedin" },
+      { label: "GitHub", w: 1.5, action: "github" },
+      { label: "Email", w: 1.5, action: "email" },
+      { label: "shipped, not read about", w: 6, blank: true, action: "wave" },
+      { label: "Sound", w: 1.5, action: "sound" },
+      { label: "LinkedIn", w: 1.5, action: "linkedin" },
     ],
   },
 ];
