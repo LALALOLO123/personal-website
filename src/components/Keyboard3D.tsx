@@ -56,9 +56,9 @@ const ROW_TILT = [0, 0, 0, 0];
    LONG SIDE VERTICAL with a slight lean, face toward the camera. Composed in
    world space - first tip the face to the camera, then roll around the view
    axis - so the angles mean what they say. */
-const POSE_TIP = 1.32; // about X: tips the face up toward the camera
-const POSE_ROLL = -0.4; // about Z: a diagonal lean, long axis still mostly horizontal
-const POSE_YAW = -0.65; // about Y: swings the right edge well forward of the left
+const POSE_TIP = 1.42; // about X: face square-on to the camera, bottom edge nearest
+const POSE_ROLL = -0.75; // about Z: halfway between standing on a corner and flat
+const POSE_YAW = -0.16; // about Y: a hint of turn only - the face stays toward us
 const FINAL_Q = new THREE.Quaternion()
   .setFromAxisAngle(new THREE.Vector3(0, 1, 0), POSE_YAW)
   .multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), POSE_ROLL))
