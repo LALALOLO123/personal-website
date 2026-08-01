@@ -20,39 +20,42 @@ import { playPress, playRelease, toggleSound } from "../data/keySound";
 type CapAction = "github" | "email" | "linkedin" | "source" | "wave";
 type Cap = { label: string; w: number; blank?: boolean; action?: CapAction };
 
-/* Every row is exactly ROW_W wide and only the two END caps are irregular -
-   they absorb whatever the row needs, the way Tab / Caps / Shift / Enter do on
-   a real board. Nothing in the middle is ever a funny size.
+/* Proportioned like a 60% board. The left column GROWS as it descends -
+   1u number row, 1.5u tab, 1.75u caps, 2.25u shift - and the right column
+   carries the wide backspace / backslash / enter / shift caps. Everything
+   between the two edges is 1u, the way it is on a real board.
 
-   Rows are grouped by kind: languages, then web and UI, then data and cloud,
-   then systems and graphics, then the function row. Everything here is on
-   Brian's resume or demonstrably in his repos. */
-const ROW_W = 13; // five rows deep, so the board needs the width to stay a board
+   Rows are laid out left-aligned from x=0, so those differing left caps
+   produce the genuine ANSI stagger for free: no row lines up with the one
+   above it, which is exactly what makes a keyboard read as a keyboard.
 
-const skillRow = (labels: string[]): Cap[] => {
-  const edge = (ROW_W - (labels.length - 2)) / 2;
-  return labels.map((label, i) => ({
+   Rows are grouped by kind: languages, then the browser, then backend and
+   cloud, then systems and silicon, then the function row. Everything here is
+   on one of Brian's resumes or in this repo. */
+const ROW_W = 12;
+
+const row = (left: number, right: number, labels: string[]): Cap[] =>
+  labels.map((label, i) => ({
     label,
-    w: i === 0 || i === labels.length - 1 ? edge : 1,
+    w: i === 0 ? left : i === labels.length - 1 ? right : 1,
   }));
-};
 
 const ROWS: { caps: Cap[] }[] = [
-  // languages, in the order he'd list them
-  { caps: skillRow(["C++", "C#", "Java", "Python", "TypeScript", "JavaScript", "Swift", "Haskell", "Bash", "SQL"]) },
-  // the browser: markup, framework, build, runtime, and what draws in it
-  { caps: skillRow(["HTML", "CSS", "React", "Next.js", "Vite", "Node", "npm", "Deno", "Three.js", "WebGL", "Unity"]) },
-  // backend, data and cloud
-  { caps: skillRow(["FastAPI", "Poetry", "PyTorch", "OpenRouter", "PostgreSQL", "Supabase", "DynamoDB", "AWS Lambda", "API Gateway", "Vercel"]) },
-  // systems, tooling, and the silicon side from United Micro / Bridgecom
-  { caps: skillRow(["Docker", "Linux", "Vim", "Git", "GitHub Actions", "Playwright", "LLVM", "SystemVerilog", "VHDL", "SystemRDL"]) },
+  // number row: 1u through, wide "backspace" on the right
+  { caps: row(1, 2, ["C++", "C#", "Java", "Python", "TypeScript", "JavaScript", "Swift", "Haskell", "Bash", "SQL", "HTML"]) },
+  // tab row
+  { caps: row(1.5, 1.5, ["CSS", "React", "Next.js", "Vite", "Node", "npm", "Deno", "Vercel", "Three.js", "WebGL", "Unity"]) },
+  // caps row, ending on the wide "enter"
+  { caps: row(1.75, 2.25, ["FastAPI", "Poetry", "PyTorch", "OpenRouter", "PostgreSQL", "Supabase", "DynamoDB", "AWS Lambda", "API Gateway", "Docker"]) },
+  // shift row: the two widest caps on the board bracket it
+  { caps: row(2.25, 2.75, ["Linux", "Vim", "Git", "GitHub Actions", "Playwright", "LLVM", "VHDL", "SystemRDL", "SystemVerilog"]) },
   {
     caps: [
-      { label: "GitHub", w: 1.75, action: "github" },
-      { label: "Email", w: 1.75, action: "email" },
+      { label: "GitHub", w: 1.5, action: "github" },
+      { label: "Email", w: 1.5, action: "email" },
       { label: "shipped, not read about", w: 6, blank: true, action: "wave" },
-      { label: "Source", w: 1.75, action: "source" },
-      { label: "LinkedIn", w: 1.75, action: "linkedin" },
+      { label: "Source", w: 1.5, action: "source" },
+      { label: "LinkedIn", w: 1.5, action: "linkedin" },
     ],
   },
 ];
@@ -113,6 +116,16 @@ const parE = new THREE.Euler();
 type Placed = Cap & { x: number; z: number; row: number; capW: number };
 
 function buildLayout() {
+  // A row that does not add up to ROW_W just renders slightly ragged, which
+  // is easy to miss and maddening to chase. Say so instead. Five rows, so
+  // this is not worth gating behind a dev flag.
+  ROWS.forEach((r, i) => {
+    const w = r.caps.reduce((s, c) => s + c.w, 0);
+    if (Math.abs(w - ROW_W) > 1e-9) {
+      console.warn(`Keyboard row ${i} is ${w}u wide, expected ${ROW_W}u`);
+    }
+  });
+
   const placed: Placed[] = [];
   ROWS.forEach((row, r) => {
     let x = 0;

@@ -83,9 +83,18 @@ const CUSTOM = {
   },
 };
 
-/* No mark exists, so these get text legends. The HDLs are open standards with
-   no logo at all; LinkedIn's is trademarked and is drawn in legendTexture
-   instead (box with the letters knocked out). */
+/* These get text legends, which is also what a real board does with its wide
+   modifiers.
+
+   Accellera does publish official logos for all three HDLs
+   (accellera.org/about/policies-and-procedures/logo-use), but they cannot be
+   used here. The policy forbids altering them or recolouring them, and every
+   legend on this board is a white monochrome mark - and worse, the
+   SystemVerilog and VHDL files are white-background rasters with no alpha at
+   all, so on a coloured keycap they would render as a white sticker. Keying
+   that background out is precisely the alteration that is not permitted.
+   LinkedIn's is trademarked too, and is drawn in legendTexture instead (a
+   tile with the letters knocked out). */
 const TEXT = {
   "LinkedIn": "7FB3E8",
   "C#": "F5A97F",
@@ -96,7 +105,7 @@ const TEXT = {
 const TEXT_LEGEND = {
   "LinkedIn": "in",
   "C#": "C#",
-  "SystemVerilog": "SV",
+  "SystemVerilog": "SystemVerilog", // it sits on the 2.75u shift, so it fits
   "VHDL": "VHDL",
   "SystemRDL": "RDL",
 };

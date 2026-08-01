@@ -46,7 +46,7 @@ export const LEGENDS: Record<string, Legend> = {
   "DynamoDB": { hex: "#4053D6", path: "M12 2C7.58 2 4 3.34 4 5s3.58 3 8 3 8-1.34 8-3-3.58-3-8-3zM4 8.5V11c0 1.66 3.58 3 8 3s8-1.34 8-3V8.5c-1.82 1.2-4.79 1.9-8 1.9s-6.18-.7-8-1.9zM4 14.5V17c0 1.66 3.58 3 8 3s8-1.34 8-3v-2.5c-1.82 1.2-4.79 1.9-8 1.9s-6.18-.7-8-1.9z" },
   "LinkedIn": { hex: "#7FB3E8", text: "in" },
   "C#": { hex: "#F5A97F", text: "C#" },
-  "SystemVerilog": { hex: "#9CC0E7", text: "SV" },
+  "SystemVerilog": { hex: "#9CC0E7", text: "SystemVerilog" },
   "VHDL": { hex: "#9CC0E7", text: "VHDL" },
   "SystemRDL": { hex: "#9CC0E7", text: "RDL" },
 };
