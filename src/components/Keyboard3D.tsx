@@ -449,8 +449,9 @@ function FitCamera({ width, depth }: { width: number; depth: number }) {
 function Board({
   onHover,
   progress,
-  onLit,
+  onLight,
   onSound,
+  armed = true,
 }: {
   onHover: (label: string | null) => void;
   /** Scroll progress of the pinned section. Crossing a small threshold ARMS
@@ -459,8 +460,13 @@ function Board({
    *  second of stillness -> the board tilts up into the reference pose.
    *  Undefined means "skip the theatre, hold the final pose, lights on". */
   progress?: MotionValue<number>;
-  /** Fired the moment the spotlight starts turning on (drives the CSS cone). */
-  onLit?: () => void;
+  /** true when the lamp comes on, false when the scene resets to darkness;
+   *  drives the CSS spotlight cone and the copy fade. */
+  onLight?: (on: boolean) => void;
+  /** False once the section has left the viewport. Going false rewinds the
+   *  whole sequence so it plays again on the next visit rather than being a
+   *  one-shot that leaves the board already standing. */
+  armed?: boolean;
   /** Reports the VOL key's new state so the caption can echo it. */
   onSound?: (on: boolean) => void;
 }) {
@@ -475,6 +481,21 @@ function Board({
   const startAt = useRef<number | null>(progress ? null : -99); // null = waiting in the dark
   const litFired = useRef(!progress);
 
+  // Rewind when the section leaves. The board is snapped back to flat and
+  // dark here rather than in useFrame, because the render loop is parked
+  // while the section is off-screen and would never run the reset.
+  useEffect(() => {
+    if (armed || !progress) return;
+    startAt.current = null;
+    litFired.current = false;
+    onLight?.(false);
+    const g = boardGroup.current;
+    if (g) {
+      g.quaternion.copy(FLAT_Q);
+      g.position.copy(FLAT_POS);
+    }
+  }, [armed, progress, onLight]);
+
   /* Timeline (seconds from trigger, wall-clock so frame stalls cannot slow
      the choreography - a dropped frame skips ahead instead of dragging):
      0.00 - 0.45  spotlight ramps on with a flicker, board flat on the floor
@@ -488,13 +509,15 @@ function Board({
     if (!g) return;
 
     const now = state.clock.elapsedTime;
+    if (!armed) return; // rewound and off-screen; nothing to draw
+
     if (startAt.current === null) {
       // still dark: armed only once the section is actually engaged
       if (progress && progress.get() > 0.04) {
         startAt.current = now;
         if (!litFired.current) {
           litFired.current = true;
-          onLit?.();
+          onLight?.(true);
         }
       }
     }
@@ -675,11 +698,11 @@ function Board({
 export default function Keyboard3D({
   paused = false,
   progress,
-  onLit,
+  onLight,
 }: {
   paused?: boolean;
   progress?: MotionValue<number>;
-  onLit?: () => void;
+  onLight?: (on: boolean) => void;
 }) {
   const [label, setLabel] = useState<string | null>(null);
   const [sound, setSound] = useState(false);
@@ -702,7 +725,7 @@ export default function Keyboard3D({
             light cone are painted by the section CSS behind this transparent
             canvas; the scene contributes the lit board, floor pool, shadow.
             Lights live inside Board so the switch-on sequence can drive them. */}
-        <Board onHover={setLabel} progress={progress} onLit={onLit} onSound={setSound} />
+        <Board onHover={setLabel} progress={progress} onLight={onLight} onSound={setSound} armed={!paused} />
       </Canvas>
 
       <p className="kb__caption" aria-live="polite">

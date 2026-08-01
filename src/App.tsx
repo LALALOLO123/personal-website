@@ -135,13 +135,15 @@ function Hero({ progress }: { progress: MotionValue<number> }) {
 function KeyboardScene({ progress }: { progress: MotionValue<number> }) {
   const sceneRef = useRef<HTMLDivElement>(null);
   // The spotlight cone and every line of copy are gated by this class:
-  // nothing in the scene is visible until the lamp turns on.
-  const handleLit = () => sceneRef.current?.closest(".stage__pin")?.classList.add("is-lit");
+  // nothing in the scene is visible until the lamp turns on, and it goes back
+  // off when the section rewinds so the next visit starts dark again.
+  const handleLight = (on: boolean) =>
+    sceneRef.current?.closest(".stage__pin")?.classList.toggle("is-lit", on);
 
   return (
     <div className="section shell field-section" ref={sceneRef}>
       <p className="section__label">What I work in</p>
-      <KeyboardSection skills={skills} progress={progress} onLit={handleLit} />
+      <KeyboardSection skills={skills} progress={progress} onLight={handleLight} />
       <p className="field-note">
         Every key is something I&rsquo;ve shipped with.{" "}
         <span className="dim">Hover one.</span>

@@ -29,11 +29,11 @@ function webglAvailable() {
 export default function KeyboardSection({
   skills,
   progress,
-  onLit,
+  onLight,
 }: {
   skills: string[];
   progress?: MotionValue<number>;
-  onLit?: () => void;
+  onLight?: (on: boolean) => void;
 }) {
   const hostRef = useRef<HTMLDivElement>(null);
   const [load, setLoad] = useState(false);
@@ -89,7 +89,7 @@ export default function KeyboardSection({
         {load ? (
           <ErrorBoundary onError={() => setFailed(true)}>
             <Suspense fallback={<KeyboardSkeleton />}>
-              <Keyboard3D paused={!visible} progress={reduce ? undefined : progress} onLit={onLit} />
+              <Keyboard3D paused={!visible} progress={reduce ? undefined : progress} onLight={onLight} />
             </Suspense>
           </ErrorBoundary>
         ) : (
