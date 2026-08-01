@@ -6,7 +6,7 @@ import { RoundedBoxGeometry } from "three-stdlib";
 import { LEGENDS } from "../data/legends";
 import { useKeycapGeometry, capGeometry, HEIGHT_RATIO } from "../data/keycapGeometry";
 import { legendGeometry, legendExtrude, brandLogo } from "../data/legendGeometry";
-import { playPress, playRelease, toggleSound } from "../data/keySound";
+import { playPress, playRelease, toggleSound, playStageLight } from "../data/keySound";
 
 /* ---------------------------------------------------------------------------
    Layout
@@ -99,7 +99,15 @@ const POSE_POS = new THREE.Vector3(0, 0.55, 0);
 
 /* Everything the whole board shares per frame; Key legends read the lamp so
    the unlit logo materials cannot glow before the spotlight is on. */
-const STAGE = { lamp: 1 };
+const STAGE = { lamp: 1, dark: false };
+
+/* Full black before the lamp strikes. Measured from when the section ARMS,
+   which is the start of the 850ms scroll, not the end of it - so this has to
+   cover the journey as well as the pause. Nets out around 1.5s of black once
+   the page has actually settled. */
+const BLACKOUT = 2.4;
+/** And then it is just ON - a switch thrown, not a fade. */
+const STRIKE = 0.2;
 
 /** Timestamp of the last spacebar hit; every key ripples off it. */
 const WAVE = { at: 0 };
@@ -551,7 +559,7 @@ const Key = memo(function Key({ cap, geometry, texture, active, onEnter, onLeave
 
 const CARD_LOGO_SIZE = 1.7;
 const CARD_TEXT_SIZE = 0.82;
-const CARD_WORDMARK_W = 3.2; // wordmarks are sized by width, not height
+const CARD_WORDMARK_W = 3.7; // wordmarks are sized by width, not height
 /** Deep slab, like the freestanding letters in the hero plan - not signage. */
 const CARD_TEXT_DEPTH = 0.54;
 /** The floor plane. The letters STAND on it rather than hovering over it. */
@@ -565,6 +573,47 @@ const CARD_YAW = 0.3;
  *  the floor. Those get lifted; everything else keeps its own colour. */
 function cardInk(hex: string): string {
   return luminance(hex) < 0.06 ? "#eceff5" : hex;
+}
+
+/* The card used to carry its own point lights, which is what put that sheen
+   across the keyboard whenever a key was hovered: three filters light layers
+   by CAMERA, not per object, so there is no way to light one object and not
+   another. A matcap solves it outright - the shading is baked into a texture
+   and sampled by surface normal, so the card reads as lit while emitting
+   nothing into the scene. */
+let matcap: THREE.CanvasTexture | null = null;
+function cardMatcap(): THREE.CanvasTexture {
+  if (matcap) return matcap;
+  const S = 256;
+  const c = document.createElement("canvas");
+  c.width = c.height = S;
+  const ctx = c.getContext("2d")!;
+
+  // base: light from above, falling off toward the bottom of the sphere
+  const base = ctx.createLinearGradient(0, 0, 0, S);
+  base.addColorStop(0, "#ffffff");
+  base.addColorStop(0.55, "#9aa0ac");
+  base.addColorStop(1, "#3a3e47");
+  ctx.fillStyle = base;
+  ctx.fillRect(0, 0, S, S);
+
+  // key highlight, upper left
+  const key = ctx.createRadialGradient(S * 0.34, S * 0.28, 0, S * 0.34, S * 0.28, S * 0.42);
+  key.addColorStop(0, "rgba(255,255,255,0.95)");
+  key.addColorStop(1, "rgba(255,255,255,0)");
+  ctx.fillStyle = key;
+  ctx.fillRect(0, 0, S, S);
+
+  // a rim so the extruded edges catch and the silhouette reads
+  const rim = ctx.createRadialGradient(S / 2, S / 2, S * 0.36, S / 2, S / 2, S * 0.5);
+  rim.addColorStop(0, "rgba(255,255,255,0)");
+  rim.addColorStop(1, "rgba(226,234,255,0.55)");
+  ctx.fillStyle = rim;
+  ctx.fillRect(0, 0, S, S);
+
+  matcap = new THREE.CanvasTexture(c);
+  matcap.colorSpace = THREE.SRGBColorSpace;
+  return matcap;
 }
 
 /** Raster marks (the Accellera ones) have no vector to extrude, so the card
@@ -623,7 +672,11 @@ function HoverCard({ label, offset }: { label: string | null; offset: { x: numbe
      glyph the keycap uses, then the raster mask. The colour logo arrives a
      frame or two late (it is fetched on hover), so the glyph shows meanwhile
      and is simply replaced - no flash of empty. */
-  const logo = shown ? brandLogo(LEGENDS[shown]?.logo, rerender) : null;
+  /* The brand's own lockup wins: mark plus name set in THEIR typeface, so the
+     name is never in a generic 3D font. 23 of the 33 publish one. The rest
+     fall back to the icon with the name set in Text3D underneath. */
+  const lockup = shown ? LEGENDS[shown]?.logoWordmark : undefined;
+  const logo = shown ? brandLogo(lockup ?? LEGENDS[shown]?.logo, rerender) : null;
   const solid = shown && !logo ? legendExtrude(shown) : null;
   const card = shown && !logo && !solid ? cardTexture(shown, rerender) : null;
   const brand = useMemo(
@@ -653,7 +706,10 @@ function HoverCard({ label, offset }: { label: string | null; offset: { x: numbe
     });
   }, [logo]);
 
-  const isWordmark = !!(shown && LEGENDS[shown]?.wordmark);
+  /* A lockup already carries the name, so no caption goes under it. Decided
+     from `lockup` rather than from whether it has finished loading, or the
+     card would show icon-plus-caption for a frame and then swap. */
+  const isWordmark = !!lockup || !!(shown && LEGENDS[shown]?.wordmark);
   // Wordmarks are wide and short, so they are sized by WIDTH; a logo mark is
   // roughly square and is sized by height. Sizing both the same way either
   // shrinks the wordmark to a strip or runs it off the side of the frame.
@@ -709,7 +765,8 @@ function HoverCard({ label, offset }: { label: string | null; offset: { x: numbe
     punch.current += (0 - punch.current) * (1 - Math.exp(-dt * 7));
 
     const p = punch.current;
-    g.visible = open.current > 0.02;
+    // matcap is unlit, so it would happily shine through the blackout
+    g.visible = open.current > 0.02 && !STAGE.dark;
     g.scale.setScalar(1 + p * 0.12);
     g.position.set(offset.x, CARD_FLOOR_Y, offset.z);
     g.rotation.y = CARD_YAW + p * 0.42;
@@ -721,23 +778,13 @@ function HoverCard({ label, offset }: { label: string | null; offset: { x: numbe
   return (
     <group ref={group} visible={false}>
       {/* its own key light: the studio spot never reaches out here */}
-      {/* Kept well above the floor: down at letter height they burned a hard
-          pool into the ground right at the corner of frame. */}
-      <pointLight position={[2.4, 4.6, 3.6]} intensity={48} distance={20} color="#eaf0ff" />
-      <pointLight position={[-2.4, 3.2, 2.4]} intensity={14} distance={11} color={brand} />
 
       {/* the real logo: one solid per fill, each in its own colour */}
       {logo && (
         <group scale={logoScale} position={[0, logoY, 0]}>
           {logo.map((part, i) => (
             <mesh key={i} geometry={part.geo} castShadow>
-              <meshStandardMaterial
-                color={logoColors![i]}
-                emissive={logoColors![i]}
-                emissiveIntensity={0.22}
-                roughness={0.32}
-                metalness={0.12}
-              />
+              <meshMatcapMaterial matcap={cardMatcap()} color={logoColors![i]} />
             </mesh>
           ))}
         </group>
@@ -745,13 +792,7 @@ function HoverCard({ label, offset }: { label: string | null; offset: { x: numbe
 
       {solid && (
         <mesh geometry={solid} scale={logoScale} position={[0, logoY, 0]} castShadow>
-          <meshStandardMaterial
-            color={brand}
-            emissive={brand}
-            emissiveIntensity={0.28}
-            roughness={0.3}
-            metalness={0.15}
-          />
+          <meshMatcapMaterial matcap={cardMatcap()} color={brand} />
         </mesh>
       )}
 
@@ -785,7 +826,7 @@ function HoverCard({ label, offset }: { label: string | null; offset: { x: numbe
             castShadow
           >
             {shown}
-            <meshStandardMaterial color="#f4f2ee" emissive="#7d8496" emissiveIntensity={0.16} roughness={0.34} metalness={0.2} />
+            <meshMatcapMaterial matcap={cardMatcap()} color="#f2f1ee" />
           </Text3D>
         </group>
       )}
@@ -919,29 +960,36 @@ function Board({
     const now = state.clock.elapsedTime;
     if (!armed) return; // rewound and off-screen; nothing to draw
 
-    if (startAt.current === null) {
-      // still dark: armed only once the section is actually engaged
-      if (live) {
-        startAt.current = now;
-        if (!litFired.current) {
-          litFired.current = true;
-          onLight?.(true);
-        }
-      }
+    if (startAt.current === null && live) {
+      // armed, but the room stays dark for a while yet
+      startAt.current = now;
     }
     const t = startAt.current === null ? -1 : startAt.current === -99 ? 99 : now - startAt.current;
 
-    // -- light ramp with a fluorescent stutter --
+    /* -- the strike --
+       Nothing at all for BLACKOUT seconds: no board, no floor, no copy, no
+       cone. Everything in the scene is a lit material with no emissive, and
+       the legends multiply by STAGE.lamp, so at lamp 0 the frame is genuinely
+       black rather than dark - nothing to glow. Then the lamp hits hard and
+       fast, which is what makes it read as a switch being thrown rather than
+       a fade-up. */
+    const s = t - BLACKOUT;
     let lamp = 0;
-    if (t >= 0) {
-      const r = THREE.MathUtils.clamp(t / 0.45, 0, 1);
+    if (s >= 0) {
+      const r = THREE.MathUtils.clamp(s / STRIKE, 0, 1);
       lamp = r * r;
-      if (t < 0.3) {
+      if (s < 0.26) {
         // two brief dips, like the ballast catching
-        if (t > 0.08 && t < 0.13) lamp *= 0.25;
-        if (t > 0.19 && t < 0.22) lamp *= 0.45;
+        if (s > 0.05 && s < 0.09) lamp *= 0.25;
+        if (s > 0.15 && s < 0.18) lamp *= 0.45;
+      }
+      if (!litFired.current) {
+        litFired.current = true;
+        onLight?.(true);
+        playStageLight();
       }
     }
+    STAGE.dark = lamp < 0.04;
     STAGE.lamp = lamp;
     /* The old 880 was set when the legends were dark ink on pale caps and
        needed all the help they could get. It put roughly 15 units of
@@ -961,7 +1009,7 @@ function Board({
     // into the pose with nothing to snap at either edge. Driven off the wall
     // clock, so it is frame-rate independent by construction.
     const RISE = 1.6;
-    const x = THREE.MathUtils.clamp((t - 0.95) / RISE, 0, 1);
+    const x = THREE.MathUtils.clamp((s - 0.5) / RISE, 0, 1);
     const u = x * x * x * (x * (x * 6 - 15) + 10);
 
     g.quaternion.slerpQuaternions(FLAT_Q, FINAL_Q, u);

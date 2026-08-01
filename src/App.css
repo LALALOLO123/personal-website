@@ -1005,3 +1005,24 @@ html {
     padding-block: 4rem;
   }
 }
+
+/* ---------------------------------------------------------------------------
+   Blackout
+
+   Before the lamp strikes there is meant to be NOTHING on screen. The nav,
+   the progress dots and the custom cursor all live outside the panel, so
+   without this they sat there glowing on an otherwise empty black frame.
+   --------------------------------------------------------------------------- */
+/* !important is load-bearing: the nav is a motion.nav, so Motion writes its
+   entrance animation to the INLINE style, which a class rule cannot beat. */
+.stage-dark .nav,
+.stage-dark .dots,
+.stage-dark .cursor {
+  opacity: 0 !important;
+  pointer-events: none;
+}
+.nav,
+.dots,
+.cursor {
+  transition: opacity 0.4s ease-out;
+}

@@ -1,35 +1,124 @@
 {
-  "C++": "/logos/brand/cplusplus.svg",
-  "C#": "/logos/brand/csharp.svg",
-  "Java": "/logos/brand/java.svg",
-  "Python": "/logos/brand/python.svg",
-  "TypeScript": "/logos/brand/typescript.svg",
-  "JavaScript": "/logos/brand/javascript.svg",
-  "Swift": "/logos/brand/swift.svg",
-  "Haskell": "/logos/brand/haskell.svg",
-  "Bash": "/logos/brand/bash.svg",
-  "HTML": "/logos/brand/html5.svg",
-  "CSS": "/logos/brand/css3.svg",
-  "React": "/logos/brand/react.svg",
-  "Next.js": "/logos/brand/nextjs.svg",
-  "Vite": "/logos/brand/vitejs.svg",
-  "Node": "/logos/brand/nodejs.svg",
-  "npm": "/logos/brand/npm.svg",
-  "Deno": "/logos/brand/denojs.svg",
-  "Vercel": "/logos/brand/vercel.svg",
-  "Three.js": "/logos/brand/threejs.svg",
-  "Unity": "/logos/brand/unity.svg",
-  "FastAPI": "/logos/brand/fastapi.svg",
-  "PyTorch": "/logos/brand/pytorch.svg",
-  "PostgreSQL": "/logos/brand/postgresql.svg",
-  "Supabase": "/logos/brand/supabase.svg",
-  "DynamoDB": "/logos/brand/dynamodb.svg",
-  "Docker": "/logos/brand/docker.svg",
-  "Vim": "/logos/brand/vim.svg",
-  "Git": "/logos/brand/git.svg",
-  "GitHub Actions": "/logos/brand/githubactions.svg",
-  "Playwright": "/logos/brand/playwright.svg",
-  "GitHub": "/logos/brand/github.svg",
-  "LinkedIn": "/logos/brand/linkedin.svg",
-  "Poetry": "/logos/brand/poetry.svg"
+  "C++": {
+    "logo": "/logos/brand/cplusplus.svg"
+  },
+  "C#": {
+    "logo": "/logos/brand/csharp.svg"
+  },
+  "Java": {
+    "logo": "/logos/brand/java.svg",
+    "wordmark": "/logos/brand/java-wordmark.svg"
+  },
+  "Python": {
+    "logo": "/logos/brand/python.svg",
+    "wordmark": "/logos/brand/python-wordmark.svg"
+  },
+  "TypeScript": {
+    "logo": "/logos/brand/typescript.svg"
+  },
+  "JavaScript": {
+    "logo": "/logos/brand/javascript.svg"
+  },
+  "Swift": {
+    "logo": "/logos/brand/swift.svg",
+    "wordmark": "/logos/brand/swift-wordmark.svg"
+  },
+  "Haskell": {
+    "logo": "/logos/brand/haskell.svg",
+    "wordmark": "/logos/brand/haskell-wordmark.svg"
+  },
+  "Bash": {
+    "logo": "/logos/brand/bash.svg"
+  },
+  "HTML": {
+    "logo": "/logos/brand/html5.svg",
+    "wordmark": "/logos/brand/html5-wordmark.svg"
+  },
+  "CSS": {
+    "logo": "/logos/brand/css3.svg",
+    "wordmark": "/logos/brand/css3-wordmark.svg"
+  },
+  "React": {
+    "logo": "/logos/brand/react.svg",
+    "wordmark": "/logos/brand/react-wordmark.svg"
+  },
+  "Next.js": {
+    "logo": "/logos/brand/nextjs.svg",
+    "wordmark": "/logos/brand/nextjs-wordmark.svg"
+  },
+  "Vite": {
+    "logo": "/logos/brand/vitejs.svg"
+  },
+  "Node": {
+    "logo": "/logos/brand/nodejs.svg",
+    "wordmark": "/logos/brand/nodejs-wordmark.svg"
+  },
+  "npm": {
+    "logo": "/logos/brand/npm.svg",
+    "wordmark": "/logos/brand/npm-wordmark.svg"
+  },
+  "Deno": {
+    "logo": "/logos/brand/denojs.svg",
+    "wordmark": "/logos/brand/denojs-wordmark.svg"
+  },
+  "Vercel": {
+    "logo": "/logos/brand/vercel.svg",
+    "wordmark": "/logos/brand/vercel-wordmark.svg"
+  },
+  "Three.js": {
+    "logo": "/logos/brand/threejs.svg",
+    "wordmark": "/logos/brand/threejs-wordmark.svg"
+  },
+  "Unity": {
+    "logo": "/logos/brand/unity.svg",
+    "wordmark": "/logos/brand/unity-wordmark.svg"
+  },
+  "FastAPI": {
+    "logo": "/logos/brand/fastapi.svg",
+    "wordmark": "/logos/brand/fastapi-wordmark.svg"
+  },
+  "PyTorch": {
+    "logo": "/logos/brand/pytorch.svg",
+    "wordmark": "/logos/brand/pytorch-wordmark.svg"
+  },
+  "PostgreSQL": {
+    "logo": "/logos/brand/postgresql.svg",
+    "wordmark": "/logos/brand/postgresql-wordmark.svg"
+  },
+  "Supabase": {
+    "logo": "/logos/brand/supabase.svg",
+    "wordmark": "/logos/brand/supabase-wordmark.svg"
+  },
+  "DynamoDB": {
+    "logo": "/logos/brand/dynamodb.svg"
+  },
+  "Docker": {
+    "logo": "/logos/brand/docker.svg",
+    "wordmark": "/logos/brand/docker-wordmark.svg"
+  },
+  "Vim": {
+    "logo": "/logos/brand/vim.svg"
+  },
+  "Git": {
+    "logo": "/logos/brand/git.svg",
+    "wordmark": "/logos/brand/git-wordmark.svg"
+  },
+  "GitHub Actions": {
+    "logo": "/logos/brand/githubactions.svg",
+    "wordmark": "/logos/brand/githubactions-wordmark.svg"
+  },
+  "Playwright": {
+    "logo": "/logos/brand/playwright.svg"
+  },
+  "GitHub": {
+    "logo": "/logos/brand/github.svg",
+    "wordmark": "/logos/brand/github-wordmark.svg"
+  },
+  "LinkedIn": {
+    "logo": "/logos/brand/linkedin.svg",
+    "wordmark": "/logos/brand/linkedin-wordmark.svg"
+  },
+  "Poetry": {
+    "logo": "/logos/brand/poetry.svg"
+  }
 }

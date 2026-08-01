@@ -33,7 +33,7 @@ if (!out) {
 
   // section 2 is the board; its reveal runs on its own clock once armed
   await page.keyboard.press("ArrowDown");
-  await new Promise((r) => setTimeout(r, 4200));
+  await new Promise((r) => setTimeout(r, Number(process.env.REVEAL_WAIT ?? 6000)));
 
   // HOVER="x,y" parks the real cursor over a key so the hover card is up
   if (process.env.HOVER) {

@@ -1,4 +1,4 @@
-import { useRef, type ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { motion, useReducedMotion, type Variants } from "motion/react";
 import "./App.css";
 import Cursor from "./components/Cursor";
@@ -104,11 +104,31 @@ function Hero({ active }: { active: boolean }) {
 
 function KeyboardScene({ active }: { active: boolean }) {
   const sceneRef = useRef<HTMLDivElement>(null);
+  const activeRef = useRef(active);
+  activeRef.current = active;
+
   // The spotlight cone and every line of copy are gated by this class:
   // nothing is visible until the lamp comes on, and it goes back off when the
   // section deactivates so the next visit starts dark again.
-  const handleLight = (on: boolean) =>
+  //
+  // `stage-dark` goes further and blacks out the whole page - nav, progress
+  // dots, custom cursor. Those live outside the panel, so during the blackout
+  // they were the only things on screen, which rather spoils a blackout.
+  const handleLight = (on: boolean) => {
     sceneRef.current?.closest(".panel")?.classList.toggle("is-lit", on);
+    document.documentElement.classList.toggle("stage-dark", !on && activeRef.current);
+  };
+
+  /* Blackout goes on when the section is ENTERED, not when the lamp reports
+     itself off: on a first visit the lamp never reports off, it has simply
+     never been on, so keying off that left the nav dot glowing in the corner
+     of an otherwise empty frame. Leaving must clear it, or the rest of the
+     site stays blacked out. */
+  useEffect(() => {
+    const root = document.documentElement;
+    root.classList.toggle("stage-dark", active);
+    return () => root.classList.remove("stage-dark");
+  }, [active]);
 
   return (
     <div className="section shell field-section" ref={sceneRef}>

@@ -88,29 +88,51 @@ function flattenGradients(svg) {
   return svg.replace(/(fill|stroke)="url\(#[^)]+\)"/g, '$1="none"');
 }
 
+async function grab(slug, variant) {
+  const res = await fetch(`${BASE}/${slug}/${slug}-${variant}.svg`);
+  if (!res.ok) return null;
+  const svg = flattenGradients(await res.text());
+  const shapes = (svg.match(/<(path|circle|ellipse|polygon|polyline|rect)\b/g) || []).length;
+  const bytes = Buffer.byteLength(svg);
+  if (shapes > MAX_PATHS || bytes > MAX_BYTES) {
+    return { tooHeavy: `${shapes} shapes, ${(bytes / 1024) | 0}KB` };
+  }
+  return { svg };
+}
+
 (async () => {
   fs.mkdirSync(OUT, { recursive: true });
   const manifest = {};
-  const skipped = [];
+  const notes = [];
+  let wordmarks = 0;
 
   for (const [label, slug] of Object.entries(BRAND)) {
-    const res = await fetch(`${BASE}/${slug}/${slug}-original.svg`);
-    if (!res.ok) {
-      skipped.push(`${label} (http ${res.status})`);
+    const icon = await grab(slug, "original");
+    if (!icon?.svg) {
+      notes.push(`${label}: monochrome mark${icon?.tooHeavy ? ` (${icon.tooHeavy})` : ""}`);
       continue;
     }
-    let svg = flattenGradients(await res.text());
-    const paths = (svg.match(/<(path|circle|ellipse|polygon|polyline|rect)\b/g) || []).length;
+    fs.writeFileSync(path.join(OUT, `${slug}.svg`), icon.svg);
+    const entry = { logo: `/logos/brand/${slug}.svg` };
 
-    if (paths > MAX_PATHS || Buffer.byteLength(svg) > MAX_BYTES) {
-      skipped.push(`${label} (${paths} shapes, ${(Buffer.byteLength(svg) / 1024) | 0}KB - too heavy to extrude)`);
-      continue;
+    /* The brand's own lockup: the mark plus its name set in THEIR typeface.
+       Where this exists the card shows it in place of icon-plus-caption, so
+       the name is never in a generic 3D font. */
+    const wm = await grab(slug, "original-wordmark");
+    if (wm?.svg) {
+      fs.writeFileSync(path.join(OUT, `${slug}-wordmark.svg`), wm.svg);
+      entry.wordmark = `/logos/brand/${slug}-wordmark.svg`;
+      wordmarks++;
+    } else if (wm?.tooHeavy) {
+      notes.push(`${label}: no wordmark (${wm.tooHeavy})`);
     }
-    fs.writeFileSync(path.join(OUT, `${slug}.svg`), svg);
-    manifest[label] = `/logos/brand/${slug}.svg`;
+    manifest[label] = entry;
   }
 
   fs.writeFileSync("scripts/brand-logos.json", JSON.stringify(manifest, null, 2) + "\n");
-  console.log(`${Object.keys(manifest).length}/${Object.keys(BRAND).length} logos -> ${OUT}`);
-  if (skipped.length) console.log("fell back to the monochrome mark:\n  " + skipped.join("\n  "));
+  console.log(
+    `${Object.keys(manifest).length}/${Object.keys(BRAND).length} logos, ` +
+      `${wordmarks} with the brand's own logotype -> ${OUT}`
+  );
+  if (notes.length) console.log("fallbacks:\n  " + notes.join("\n  "));
 })();
