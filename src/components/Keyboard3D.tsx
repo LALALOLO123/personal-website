@@ -553,7 +553,7 @@ const CARD_LOGO_SIZE = 1.7;
 const CARD_TEXT_SIZE = 0.82;
 const CARD_WORDMARK_W = 3.2; // wordmarks are sized by width, not height
 /** Deep slab, like the freestanding letters in the hero plan - not signage. */
-const CARD_TEXT_DEPTH = 0.82;
+const CARD_TEXT_DEPTH = 0.54;
 /** The floor plane. The letters STAND on it rather than hovering over it. */
 const CARD_FLOOR_Y = -5.4;
 /** Turned to face right. Negative would swing the face to the left, which is
@@ -598,12 +598,17 @@ function cardTexture(label: string, onLoad?: () => void): CardTex | null {
 function HoverCard({ label, offset }: { label: string | null; offset: { x: number; z: number } }) {
   const group = useRef<THREE.Group>(null);
   const textRef = useRef<THREE.Group>(null);
+  const open = useRef(0);
+  const punch = useRef(0);
   // Keep the last real label mounted so leaving a key does not tear the
   // geometry down and rebuild it on the next hover.
   const [shown, setShown] = useState<string | null>(null);
 
   useEffect(() => {
-    if (label) setShown(label);
+    if (label) {
+      setShown(label);
+      punch.current = 1; // restart the settle on every swap
+    }
   }, [label]);
 
   const [, bump] = useState(0);
@@ -661,16 +666,23 @@ function HoverCard({ label, offset }: { label: string | null; offset: { x: numbe
     g.position.x = -(b.min.x + b.max.x) / 2;
   }, [shown, isWordmark]);
 
-  /* It appears, and that is all. No drift, no spin, no settle: these are meant
-     to read as a landmark standing on the ground - the kind of freestanding
-     letters you walk past - and a sculpture that bobs stops being a
-     sculpture. Position and rotation are fixed; only visibility changes. */
-  useFrame(() => {
+  /* Animates INTO the grounded pose rather than around it: the resting state
+     is still a sculpture standing on the floor, and the entry is what moves.
+     Rises the last bit, overshoots a touch on scale, and swings out of the
+     yaw - so swapping keys reads as a selection changing. */
+  useFrame((_, dt) => {
     const g = group.current;
     if (!g) return;
-    g.visible = !!label;
-    g.position.set(offset.x, CARD_FLOOR_Y, offset.z);
-    g.rotation.y = CARD_YAW;
+    open.current += ((label ? 1 : 0) - open.current) * (1 - Math.exp(-dt * 11));
+    punch.current += (0 - punch.current) * (1 - Math.exp(-dt * 7));
+
+    const o = open.current;
+    const p = punch.current;
+    g.visible = o > 0.002;
+    g.scale.setScalar(o * (1 + p * 0.12));
+    g.position.set(offset.x, CARD_FLOOR_Y - (1 - o) * 0.7, offset.z);
+    g.rotation.y = CARD_YAW + p * 0.42;
+    g.rotation.x = p * -0.1;
   });
 
   if (!shown) return null;
