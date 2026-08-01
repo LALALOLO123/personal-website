@@ -48,7 +48,7 @@ const ROWS: { caps: Cap[] }[] = [
   // caps row, ending on the wide "enter"
   { caps: row(1.75, 2.25, ["FastAPI", "Poetry", "PyTorch", "OpenRouter", "PostgreSQL", "Supabase", "DynamoDB", "AWS Lambda", "API Gateway", "Docker"]) },
   // shift row: the two widest caps on the board bracket it
-  { caps: row(2.25, 2.75, ["Linux", "Vim", "Git", "GitHub Actions", "Playwright", "LLVM", "VHDL", "SystemRDL", "SystemVerilog"]) },
+  { caps: row(2.25, 2.75, ["VHDL", "Linux", "Vim", "Git", "GitHub Actions", "Playwright", "LLVM", "SystemRDL", "SystemVerilog"]) },
   {
     caps: [
       { label: "GitHub", w: 1.5, action: "github" },
@@ -160,13 +160,13 @@ function buildLayout() {
  *  Simple Icons paths do not all fill their viewBox - some are inset, and the
  *  wordmarks (WebGL) are wide and short. Centring on the viewBox instead of on
  *  the actual ink leaves those marks small and off-centre on the cap. */
-function inkBounds(path: string) {
+function inkBounds(path: string, box = 24) {
   const N = 64;
   const c = document.createElement("canvas");
   c.width = c.height = N;
   const ctx = c.getContext("2d");
   if (!ctx) return null;
-  ctx.scale(N / 24, N / 24);
+  ctx.scale(N / box, N / box);
   ctx.fillStyle = "#fff";
   ctx.fill(new Path2D(path));
 
@@ -184,7 +184,7 @@ function inkBounds(path: string) {
   }
   if (maxX < 0) return null;
 
-  const u = 24 / N; // back to path units
+  const u = box / N; // back to path units
   return {
     x: minX * u,
     y: minY * u,
@@ -193,14 +193,23 @@ function inkBounds(path: string) {
   };
 }
 
+/** The patch of cap a legend gets. Raster wordmarks (the Accellera marks)
+ *  are wide and short, so they are given nearly the whole cap - at the 0.78
+ *  used for logo marks they came out noticeably smaller than the vector
+ *  wordmarks next to them, which get scaled up separately via MARK_SCALE.
+ *  Shared, so the texture's aspect and the mesh it lands on cannot drift. */
+function legendPlane(cap: Cap) {
+  const capW = cap.w * U - GAP;
+  return { w: capW * (LEGENDS[cap.label]?.img ? 0.94 : 0.78), d: (U - GAP) * 0.7 };
+}
+
 function legendTexture(cap: Cap): THREE.CanvasTexture | null {
   if (!cap.label) return null; // blank modifier caps carry nothing
   const S = 256;
   // Canvas aspect matches the legend plane on this cap, so wide caps get
   // wide textures and nothing ever stretches.
-  const capW = cap.w * U - GAP;
-  const planeAspect = (capW * 0.78) / ((U - GAP) * 0.7);
-  const W = Math.max(1, Math.round(S * planeAspect));
+  const plane = legendPlane(cap);
+  const W = Math.max(1, Math.round(S * (plane.w / plane.d)));
   const c = document.createElement("canvas");
   c.width = W;
   c.height = S;
@@ -240,7 +249,7 @@ function legendTexture(cap: Cap): THREE.CanvasTexture | null {
     }
     ctx.fillText(spaced, W / 2, S / 2);
   } else if (L?.path) {
-    const b = inkBounds(L.path);
+    const b = inkBounds(L.path, L.box);
     if (!b) return null;
     const scale = Math.min((W * 0.56) / b.w, (S * 0.6) / b.h);
     ctx.save();
@@ -257,13 +266,34 @@ function legendTexture(cap: Cap): THREE.CanvasTexture | null {
       ctx.font = `700 ${size}px "JetBrains Mono", ui-monospace, monospace`;
     }
     ctx.fillText(L.text, W / 2, S / 2 + size * 0.04);
-  } else {
+  } else if (!L?.img) {
     return null;
   }
 
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
   tex.anisotropy = 8;
+
+  if (L?.img) {
+    /* The official Accellera marks are raster only, pre-flattened to white
+       ink on transparent. Drawn after the fact because decoding is async -
+       the texture is already on the material by then, so it just needs to be
+       told it changed. Wordmarks, so they take the cap's full width. */
+    const im = new Image();
+    im.onload = () => {
+      const s = Math.min((W * 0.98) / im.width, (S * 0.8) / im.height);
+      ctx.drawImage(
+        im,
+        W / 2 - (im.width * s) / 2,
+        S / 2 - (im.height * s) / 2,
+        im.width * s,
+        im.height * s
+      );
+      tex.needsUpdate = true;
+    };
+    im.src = L.img;
+  }
+
   return tex;
 }
 
@@ -311,14 +341,8 @@ const NEUTRAL = CANDYWAY.cap;
 const CAP_TINT: Record<string, string> = {
   // simple-icons publishes OpenJDK as black; the Java logo's own blue keeps
   // the languages row from turning into a wall of charcoal.
-  Java: "#5382A1",
-  "C#": "#512BD4", // the .NET purple it ships under
   LinkedIn: "#0A66C2",
-  /* Open standards with no logo and no brand colour, so these are chosen
-     rather than sourced - a silicon palette that reads as one group. */
-  SystemVerilog: "#1F7A8C",
-  VHDL: "#B5651D",
-  SystemRDL: "#6A6FA8",
+  // no brand of its own: chosen, not sourced
   SQL: "#3E5C76",
   // the function keys stay charcoal, like the modifiers on a real board
   Email: NEUTRAL,
@@ -460,8 +484,7 @@ const Key = memo(function Key({ cap, geometry, texture, active, onEnter, onLeave
   const vector = cap.blank ? null : legendGeometry(cap.label);
   // marks sit at a consistent share of the 1u cap regardless of cap width
   const markSize = BASE * 0.46 * (MARK_SCALE[cap.label] ?? 1);
-  const legendW = cap.capW * 0.78;
-  const legendD = (U - GAP) * 0.7;
+  const { w: legendW, d: legendD } = legendPlane(cap);
 
   return (
     <group ref={group} position={[cap.x, baseY, cap.z]} rotation={[ROW_TILT, 0, 0]}>

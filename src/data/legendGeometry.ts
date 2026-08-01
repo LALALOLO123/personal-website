@@ -32,7 +32,11 @@ export function legendGeometry(label: string): THREE.BufferGeometry | null {
     return null;
   }
 
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="${path}"/></svg>`;
+  // simple-icons is a 24-unit box; marks lifted from elsewhere (devicon's C#
+  // is 128) carry their own. The geometry is normalised below either way, but
+  // the parser needs the right extents.
+  const box = LEGENDS[label]?.box ?? 24;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${box} ${box}"><path d="${path}"/></svg>`;
   const parsed = loader.parse(svg);
   // three-stdlib types SVGResultPaths slightly looser than ShapePath; the
   // runtime object is the same thing.
