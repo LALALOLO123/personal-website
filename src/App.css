@@ -1270,3 +1270,38 @@ html {
   cursor: grab;
   padding: 0;
 }
+
+/* ---------------------------------------------------------------------------
+   The floating panel
+
+   Rendered here rather than generated, so the content can never lose
+   registration with it. It is allowed to drift precisely BECAUSE it drifts
+   with what it carries.
+   --------------------------------------------------------------------------- */
+.plate--plane .plate__screen {
+  animation: panel-drift 11s ease-in-out infinite;
+}
+@keyframes panel-drift {
+  0%, 100% { translate: 0 0; }
+  50%      { translate: 0 -0.9%; }
+}
+.plate--plane .plate__reel {
+  background: #07060d;
+  box-shadow:
+    0 0 2px rgba(196, 226, 255, 0.9),
+    0 0 26px rgba(120, 170, 255, 0.35),
+    0 0 90px rgba(120, 150, 255, 0.28);
+}
+/* the bloom the panel throws into the air around it */
+.plate__halo {
+  position: absolute;
+  inset: -14%;
+  pointer-events: none;
+  background: radial-gradient(
+    closest-side,
+    rgba(150, 190, 255, 0.3),
+    rgba(120, 150, 255, 0.08) 55%,
+    transparent 78%
+  );
+  filter: blur(14px);
+}

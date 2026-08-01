@@ -24,16 +24,25 @@ import { playStageLight } from "../data/keySound";
    it prints the quad to paste back in here.
    --------------------------------------------------------------------------- */
 
-const PLATE = "/shots/plate-placeholder.jpg";
+const PLATE = "/shots/plate-plane.jpg";
 const PLATE_AR = 16 / 9;
 
-/** Where the screen sits in the plate, as fractions of its width and height.
- *  Normalised so it survives any container size. Re-measure with &calib=1. */
+/* Where the floating panel hangs, as fractions of the plate.
+ *
+ * The panel is OURS, not the generator's - and that is the important
+ * decision. Ask a video model for a "floating screen" and it will drift, bob
+ * and shimmer, which is exactly the one thing an overlay cannot survive:
+ * there is no fixing lost registration without frame-by-frame tracking.
+ * Rendering it here means it can float as much as it likes, because the
+ * content floats WITH it and can never come unstuck.
+ *
+ * The plate supplies only what a model is genuinely better at than us - the
+ * plane, the sky, the trees, the machine. */
 const SCREEN_QUAD: Quad = [
-  { x: 0.1875, y: 0.1667 },
-  { x: 0.7375, y: 0.1333 },
-  { x: 0.7562, y: 0.6778 },
-  { x: 0.2062, y: 0.7222 },
+  { x: 0.215, y: 0.135 },
+  { x: 0.735, y: 0.115 },
+  { x: 0.742, y: 0.605 },
+  { x: 0.222, y: 0.625 },
 ];
 
 /** The overlay's own pixel space, before it gets warped. */
@@ -117,7 +126,7 @@ export default function WorkPlate({ onSelect }: { onSelect: (i: Item) => void })
   );
 
   return (
-    <div className="plate">
+    <div className="plate plate--plane">
       <div className="plate__inner" ref={hostRef} style={{ aspectRatio: String(PLATE_AR) }}>
         <img className="plate__img" src={PLATE} alt="" draggable={false} />
 
@@ -128,6 +137,7 @@ export default function WorkPlate({ onSelect }: { onSelect: (i: Item) => void })
           className="plate__screen"
           style={{ width: CONTENT_W, height: CONTENT_H, transform }}
         >
+          <div className="plate__halo" aria-hidden="true" />
           <div className="plate__reel" key={item.title}>
             {reel ? (
               item.reel.clip ? (
