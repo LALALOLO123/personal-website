@@ -69,11 +69,11 @@ export function legendExtrude(label: string): THREE.BufferGeometry | null {
   // Bevel and depth are in path units, so they scale with the source viewBox
   // (24 for simple-icons, 128 for devicon) and survive normalisation.
   const geo = new THREE.ExtrudeGeometry(shapes, {
-    depth: box * 0.1,
+    depth: box * 0.26, // a slab, not a decal
     bevelEnabled: true,
-    bevelThickness: box * 0.012,
-    bevelSize: box * 0.01,
-    bevelSegments: 2,
+    bevelThickness: box * 0.02,
+    bevelSize: box * 0.016,
+    bevelSegments: 3,
     curveSegments: 12,
   });
   geo.rotateX(Math.PI);

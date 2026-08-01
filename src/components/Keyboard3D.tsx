@@ -549,9 +549,23 @@ const Key = memo(function Key({ cap, geometry, texture, active, onEnter, onLeave
    board feels like moving a selection through a menu.
    --------------------------------------------------------------------------- */
 
-const CARD_LOGO_SIZE = 1.5;
-const CARD_TEXT_SIZE = 0.62;
-const CARD_WORDMARK_W = 3.1; // wordmarks are sized by width, not height
+const CARD_LOGO_SIZE = 1.7;
+const CARD_TEXT_SIZE = 0.82;
+const CARD_WORDMARK_W = 3.2; // wordmarks are sized by width, not height
+/** Deep slab, like the freestanding letters in the hero plan - not signage. */
+const CARD_TEXT_DEPTH = 0.46;
+/** The floor plane. The letters STAND on it rather than hovering over it. */
+const CARD_FLOOR_Y = -5.4;
+/** Turned to face right. Negative would swing the face to the left, which is
+ *  away from the board it belongs to. */
+const CARD_YAW = 0.3;
+
+/** The card sits in an unlit corner, so a brand that is black - Vercel,
+ *  Next.js, Deno, Three.js, GitHub - would be an invisible silhouette against
+ *  the floor. Those get lifted; everything else keeps its own colour. */
+function cardInk(hex: string): string {
+  return luminance(hex) < 0.06 ? "#eceff5" : hex;
+}
 
 /** Raster marks (the Accellera ones) have no vector to extrude, so the card
  *  shows the mask on a plane instead. Cached, one texture per label. */
@@ -581,26 +595,21 @@ function cardTexture(label: string, onLoad?: () => void): CardTex | null {
   return entry;
 }
 
-function HoverCard({ label, offset }: { label: string | null; offset: { x: number; y: number } }) {
+function HoverCard({ label, offset }: { label: string | null; offset: { x: number; z: number } }) {
   const group = useRef<THREE.Group>(null);
-  // Hold the last real label so the card can animate OUT with its own content
-  // still on it rather than blanking the instant the pointer leaves.
+  // Keep the last real label mounted so leaving a key does not tear the
+  // geometry down and rebuild it on the next hover.
   const [shown, setShown] = useState<string | null>(null);
-  const open = useRef(0);
-  const punch = useRef(0);
 
   useEffect(() => {
-    if (label) {
-      setShown(label);
-      punch.current = 1; // restart the settle on every swap
-    }
+    if (label) setShown(label);
   }, [label]);
 
   const [, bump] = useState(0);
   const solid = shown ? legendExtrude(shown) : null;
   const card = shown && !solid ? cardTexture(shown, () => bump((n) => n + 1)) : null;
   const brand = useMemo(
-    () => new THREE.Color(shown ? LEGENDS[shown]?.hex ?? "#ffffff" : "#ffffff"),
+    () => new THREE.Color(cardInk(shown ? LEGENDS[shown]?.hex ?? "#ffffff" : "#ffffff")),
     [shown]
   );
   const isWordmark = !!(shown && LEGENDS[shown]?.wordmark);
@@ -610,22 +619,31 @@ function HoverCard({ label, offset }: { label: string | null; offset: { x: numbe
   const cardW = card
     ? Math.min(CARD_LOGO_SIZE * card.aspect, CARD_WORDMARK_W)
     : CARD_LOGO_SIZE;
+  const logoScale = isWordmark ? CARD_WORDMARK_W : CARD_LOGO_SIZE;
 
-  useFrame((_, dt) => {
+  /* Everything is stacked UP from the floor, so the group's origin can sit on
+     the ground plane: caption first, mark above it. A wordmark has no caption
+     under it, so it stands on the ground itself. */
+  const solidH = useMemo(() => {
+    if (!solid) return 0;
+    solid.computeBoundingBox();
+    const b = solid.boundingBox!;
+    return (b.max.y - b.min.y) * logoScale;
+  }, [solid, logoScale]);
+  const logoH = card ? cardW / card.aspect : solidH;
+  const capBase = isWordmark ? 0 : CARD_TEXT_SIZE + 0.42;
+  const logoY = capBase + logoH / 2;
+
+  /* It appears, and that is all. No drift, no spin, no settle: these are meant
+     to read as a landmark standing on the ground - the kind of freestanding
+     letters you walk past - and a sculpture that bobs stops being a
+     sculpture. Position and rotation are fixed; only visibility changes. */
+  useFrame(() => {
     const g = group.current;
     if (!g) return;
-    const k = 1 - Math.exp(-dt * 11);
-    open.current += ((label ? 1 : 0) - open.current) * k;
-    punch.current += (0 - punch.current) * (1 - Math.exp(-dt * 7));
-
-    const o = open.current;
-    const p = punch.current;
-    g.visible = o > 0.002;
-    // overshoot on entry, then settle - the menu-select feel
-    g.scale.setScalar(o * (1 + p * 0.14));
-    g.position.set(offset.x, offset.y - (1 - o) * 0.7, 1.6);
-    g.rotation.y = -0.34 + p * 0.5;
-    g.rotation.x = p * -0.12;
+    g.visible = !!label;
+    g.position.set(offset.x, CARD_FLOOR_Y, offset.z);
+    g.rotation.y = CARD_YAW;
   });
 
   if (!shown) return null;
@@ -633,19 +651,17 @@ function HoverCard({ label, offset }: { label: string | null; offset: { x: numbe
   return (
     <group ref={group} visible={false}>
       {/* its own key light: the studio spot never reaches out here */}
-      <pointLight position={[1.6, 1.8, 3]} intensity={26} distance={14} color="#eaf0ff" />
-      <pointLight position={[-2.4, -0.6, 2]} intensity={10} distance={10} color={brand} />
+      {/* Kept well above the floor: down at letter height they burned a hard
+          pool into the ground right at the corner of frame. */}
+      <pointLight position={[2.4, 4.6, 3.6]} intensity={48} distance={20} color="#eaf0ff" />
+      <pointLight position={[-2.4, 3.2, 2.4]} intensity={14} distance={11} color={brand} />
 
       {solid && (
-        <mesh
-          geometry={solid}
-          scale={isWordmark ? CARD_WORDMARK_W : CARD_LOGO_SIZE}
-          position={[0, isWordmark ? 0.2 : 1.05, 0]}
-        >
+        <mesh geometry={solid} scale={logoScale} position={[0, logoY, 0]} castShadow>
           <meshStandardMaterial
             color={brand}
             emissive={brand}
-            emissiveIntensity={0.34}
+            emissiveIntensity={0.28}
             roughness={0.3}
             metalness={0.15}
           />
@@ -654,8 +670,8 @@ function HoverCard({ label, offset }: { label: string | null; offset: { x: numbe
 
       {/* no vector for this one: the official mark, flat but still in-world */}
       {card && (
-        <mesh position={[0, isWordmark ? 0.2 : 1.05, 0]}>
-          <planeGeometry args={[cardW, cardW / card.aspect]} />
+        <mesh position={[0, logoY, 0]}>
+          <planeGeometry args={[cardW, logoH]} />
           <meshBasicMaterial map={card.tex} transparent depthWrite={false} toneMapped={false} />
         </mesh>
       )}
@@ -663,19 +679,21 @@ function HoverCard({ label, offset }: { label: string | null; offset: { x: numbe
       {/* A wordmark already says the name; setting it again underneath just
           prints the word twice. */}
       {!isWordmark && (
-        <Center position={[0, -0.35, 0]}>
+        // centred across, but NOT vertically: the baseline stays on the floor
+        <Center disableY position={[0, 0, 0]}>
           <Text3D
             font="/fonts/helvetiker_bold.typeface.json"
             size={CARD_TEXT_SIZE}
-            height={0.16}
+            height={CARD_TEXT_DEPTH}
             bevelEnabled
-            bevelThickness={0.012}
-            bevelSize={0.009}
-            bevelSegments={2}
-            curveSegments={5}
+            bevelThickness={0.022}
+            bevelSize={0.016}
+            bevelSegments={3}
+            curveSegments={6}
+            castShadow
           >
             {shown}
-            <meshStandardMaterial color="#f4f2ee" emissive="#8d94a6" emissiveIntensity={0.2} roughness={0.34} metalness={0.2} />
+            <meshStandardMaterial color="#f4f2ee" emissive="#7d8496" emissiveIntensity={0.16} roughness={0.34} metalness={0.2} />
           </Text3D>
         </Center>
       )}
@@ -945,10 +963,13 @@ function Board({
   /* Sits off the board's lower-left corner, derived from the board size so it
      stays put if the layout changes. The board is posed on its corner, so
      that part of frame is empty. */
-  const cardAt = useMemo(
-    () => ({ x: -width * 0.38, y: -depth * 0.62 - 0.6 }),
-    [width, depth]
-  );
+  /* Off the board's lower-left, standing on the floor. The board is posed on
+     its corner, so that part of frame is empty. z brings it forward of the
+     board so it reads as nearer to camera, not tucked behind. */
+  /* z matters for FRAMING as much as depth: the camera sits just below the
+     origin looking slightly up, so bringing the card toward the lens pushes
+     it DOWN the frame and off the bottom. Held near the board's own depth. */
+  const cardAt = useMemo(() => ({ x: -width * 0.4, z: -0.4 }), [width]);
 
   return (
     <>
