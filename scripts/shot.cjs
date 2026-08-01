@@ -39,7 +39,7 @@ if (!out) {
   if (process.env.HOVER) {
     const [hx, hy] = process.env.HOVER.split(",").map(Number);
     await page.mouse.move(hx, hy);
-    await new Promise((r) => setTimeout(r, 900));
+    await new Promise((r) => setTimeout(r, Number(process.env.HOVER_WAIT ?? 900)));
   }
 
   const full = await page.screenshot({ type: "png" });

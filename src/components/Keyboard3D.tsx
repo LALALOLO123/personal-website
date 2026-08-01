@@ -604,11 +604,17 @@ function HoverCard({ label, offset }: { label: string | null; offset: { x: numbe
   // geometry down and rebuild it on the next hover.
   const [shown, setShown] = useState<string | null>(null);
 
+  /* Bail on null rather than clearing prevLabel: moving from one key to the
+     next sends a null in between as the first key's pointerout lands before
+     the second's pointerover. Holding the last label across that gap is what
+     lets a genuine swap be told apart from a first appearance - and only a
+     swap gets the settle. */
+  const prevLabel = useRef<string | null>(null);
   useEffect(() => {
-    if (label) {
-      setShown(label);
-      punch.current = 1; // restart the settle on every swap
-    }
+    if (!label) return;
+    if (prevLabel.current && prevLabel.current !== label) punch.current = 1;
+    prevLabel.current = label;
+    setShown(label);
   }, [label]);
 
   const [, bump] = useState(0);
@@ -624,6 +630,29 @@ function HoverCard({ label, offset }: { label: string | null; offset: { x: numbe
     () => new THREE.Color(cardInk(shown ? LEGENDS[shown]?.hex ?? "#ffffff" : "#ffffff")),
     [shown]
   );
+  /* cardInk lifts a black brand hex, but that only covers the monochrome
+     path - a full-colour logo carries black in its own fills, so Vercel,
+     Next.js, Three.js and GitHub came back as invisible silhouettes against
+     the floor. Judged on the mark AS A WHOLE: if nothing in it has any real
+     brightness the entire thing is lifted, keeping the relative values so a
+     two-tone mark stays two-tone. Anything with actual colour in it is left
+     exactly as the brand publishes it, so Docker's dark hull and Java's
+     outline are untouched. */
+  const logoColors = useMemo(() => {
+    if (!logo) return null;
+    const cols = logo.map((p) => new THREE.Color(p.color));
+    const peak = Math.max(
+      ...cols.map((c) => 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b)
+    );
+    if (peak > 0.05) return cols;
+    const hsl = { h: 0, s: 0, l: 0 };
+    return cols.map((c) => {
+      c.getHSL(hsl, THREE.SRGBColorSpace);
+      c.setHSL(hsl.h, hsl.s, Math.min(0.97, 0.74 + hsl.l * 1.8), THREE.SRGBColorSpace);
+      return c;
+    });
+  }, [logo]);
+
   const isWordmark = !!(shown && LEGENDS[shown]?.wordmark);
   // Wordmarks are wide and short, so they are sized by WIDTH; a logo mark is
   // roughly square and is sized by height. Sizing both the same way either
@@ -666,21 +695,23 @@ function HoverCard({ label, offset }: { label: string | null; offset: { x: numbe
     g.position.x = -(b.min.x + b.max.x) / 2;
   }, [shown, isWordmark]);
 
-  /* Animates INTO the grounded pose rather than around it: the resting state
-     is still a sculpture standing on the floor, and the entry is what moves.
-     Rises the last bit, overshoots a touch on scale, and swings out of the
-     yaw - so swapping keys reads as a selection changing. */
+  /* The card simply APPEARS - full size, in place. `open` is a visibility
+     latch only and deliberately drives neither scale nor position; ramping
+     those made it grow up out of the floor on first hover. The small ramp is
+     still there so the one-frame gap between leaving one key and entering the
+     next does not flicker it off and on.
+     `punch` is the only motion left, and it fires only when SWAPPING between
+     keys - a small settle that reads as the selection changing. */
   useFrame((_, dt) => {
     const g = group.current;
     if (!g) return;
-    open.current += ((label ? 1 : 0) - open.current) * (1 - Math.exp(-dt * 11));
+    open.current += ((label ? 1 : 0) - open.current) * (1 - Math.exp(-dt * 16));
     punch.current += (0 - punch.current) * (1 - Math.exp(-dt * 7));
 
-    const o = open.current;
     const p = punch.current;
-    g.visible = o > 0.002;
-    g.scale.setScalar(o * (1 + p * 0.12));
-    g.position.set(offset.x, CARD_FLOOR_Y - (1 - o) * 0.7, offset.z);
+    g.visible = open.current > 0.02;
+    g.scale.setScalar(1 + p * 0.12);
+    g.position.set(offset.x, CARD_FLOOR_Y, offset.z);
     g.rotation.y = CARD_YAW + p * 0.42;
     g.rotation.x = p * -0.1;
   });
@@ -701,8 +732,8 @@ function HoverCard({ label, offset }: { label: string | null; offset: { x: numbe
           {logo.map((part, i) => (
             <mesh key={i} geometry={part.geo} castShadow>
               <meshStandardMaterial
-                color={part.color}
-                emissive={part.color}
+                color={logoColors![i]}
+                emissive={logoColors![i]}
                 emissiveIntensity={0.22}
                 roughness={0.32}
                 metalness={0.12}
