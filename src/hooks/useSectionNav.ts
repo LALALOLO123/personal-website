@@ -38,11 +38,18 @@ function sectionTop(i: number) {
   return el ? el.offsetTop : i * window.innerHeight;
 }
 
-export function useSectionNav(count: number, enabled: boolean) {
+/** Runs before a move and can hold it up. Return a promise to make the nav
+ *  wait - the hero uses it to play the robot beat before handing over. */
+export type Gate = (from: number, to: number) => Promise<void> | null | undefined;
+
+export function useSectionNav(count: number, enabled: boolean, gate?: Gate) {
   const [index, setIndex] = useState(0);
   const busy = useRef(false);
   const indexRef = useRef(0);
   indexRef.current = index;
+
+  const gateRef = useRef<Gate | undefined>(gate);
+  gateRef.current = gate;
 
   const goTo = useCallback(
     (target: number, animate = true) => {
@@ -50,6 +57,22 @@ export function useSectionNav(count: number, enabled: boolean) {
       const from = window.scrollY;
       const to = sectionTop(i);
       if (i === indexRef.current && Math.abs(from - to) < 2) return;
+
+      /* A gate can hold the move open - the hero plays its exit to black
+         before the keyboard arrives. Stay busy for the whole wait so a second
+         gesture cannot queue another jump behind it, and land INSTANTLY when
+         it resolves: the screen is already black by then, and animating a
+         scroll nobody can see just delays the next section. */
+      const held = gateRef.current?.(indexRef.current, i);
+      if (held) {
+        busy.current = true;
+        held.then(() => {
+          setIndex(i);
+          window.scrollTo(0, sectionTop(i));
+          window.setTimeout(() => (busy.current = false), COOLDOWN);
+        });
+        return;
+      }
 
       setIndex(i);
       if (!animate) {

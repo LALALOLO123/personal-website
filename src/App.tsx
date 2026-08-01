@@ -1,14 +1,15 @@
-import { lazy, Suspense, useEffect, useRef, useState, type ReactNode } from "react";
+import { lazy, Suspense, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { motion, useReducedMotion, type Variants } from "motion/react";
 import "./App.css";
 import Cursor from "./components/Cursor";
+import HeroFilm, { type HeroHandle } from "./components/HeroFilm";
 // Smoke tests only. Lazy, so three.js never reaches the main chunk.
 const WorkScene = lazy(() => import("./components/WorkScene"));
 // prototype: generated room as a plate, live content warped onto its screen
 const WorkPlate = lazy(() => import("./components/WorkPlate"));
 import KeyboardSection from "./components/KeyboardSection";
 import { SplitText, Magnetic } from "./components/Bits";
-import { useSectionNav } from "./hooks/useSectionNav";
+import { useSectionNav, type Gate } from "./hooks/useSectionNav";
 import { soundEnabled, toggleSound } from "./data/keySound";
 import { profile, skills } from "./data/content";
 
@@ -53,59 +54,6 @@ const rise: Variants = {
 };
 
 /* ------------------------------- sections -------------------------------- */
-
-function Hero({ active }: { active: boolean }) {
-  const reduce = useReducedMotion();
-  const state = active || reduce ? "show" : "hidden";
-  return (
-    <div className="hero">
-      <motion.p className="hero__eyebrow" variants={rise} initial="hidden" animate={state} custom={0}>
-        {profile.role}
-      </motion.p>
-
-      <h1 className="hero__title">
-        <motion.span
-          style={{ display: "block" }}
-          variants={rise}
-          initial="hidden"
-          animate={state}
-          custom={1}
-        >
-          Building things
-        </motion.span>
-        <motion.em
-          className="grad-ink"
-          style={{ display: "block" }}
-          variants={rise}
-          initial="hidden"
-          animate={state}
-          custom={2}
-        >
-          that hold up.
-        </motion.em>
-      </h1>
-
-      <motion.p className="hero__sub" variants={rise} initial="hidden" animate={state} custom={3}>
-        {profile.tagline}
-      </motion.p>
-
-      <motion.div
-        className="scrollcue"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: active ? 1 : 0 }}
-        transition={{ duration: 0.8, delay: active ? 1.2 : 0 }}
-      >
-        <span>Scroll</span>
-        <motion.span
-          className="scrollcue__line"
-          animate={{ scaleY: [1, 0.4, 1], opacity: [1, 0.4, 1] }}
-          transition={{ duration: 2.2, repeat: Infinity, ease: "easeInOut" }}
-          style={{ transformOrigin: "top" }}
-        />
-      </motion.div>
-    </div>
-  );
-}
 
 function KeyboardScene({ active }: { active: boolean }) {
   const sceneRef = useRef<HTMLDivElement>(null);
@@ -254,7 +202,14 @@ const SECTIONS = ["top", "craft", "work", "contact"] as const;
 export default function App() {
   const reduce = useReducedMotion();
   // Reduced motion keeps native scrolling; hijacking it would be hostile.
-  const { index, goTo } = useSectionNav(SECTIONS.length, !reduce);
+  const heroRef = useRef<HeroHandle>(null);
+  /* Leaving the hero is not a scroll, it is a cut: the robot pulls the view
+     to black and the keyboard is already waiting behind it. */
+  const gate = useCallback<Gate>(
+    (from, to) => (from === 0 && to === 1 ? heroRef.current?.runExit() ?? null : null),
+    []
+  );
+  const { index, goTo } = useSectionNav(SECTIONS.length, !reduce, gate);
   const [sound, setSound] = useState(soundEnabled());
 
   return (
@@ -308,8 +263,8 @@ export default function App() {
           </div>
         </motion.nav>
 
-        <Panel id="top" active={index === 0}>
-          <Hero active={index === 0} />
+        <Panel id="top" active={index === 0} className="panel--film">
+          <HeroFilm ref={heroRef} active={index === 0} />
         </Panel>
 
         <Panel id="craft" active={index === 1} className="panel--void">
