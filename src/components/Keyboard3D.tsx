@@ -5,6 +5,7 @@ import { Html } from "@react-three/drei";
 import * as THREE from "three";
 import { RoundedBoxGeometry } from "three-stdlib";
 import { LEGENDS } from "../data/legends";
+import { useKeycapGeometry, capGeometry, HEIGHT_RATIO } from "../data/keycapGeometry";
 
 /* ---------------------------------------------------------------------------
    Layout
@@ -32,7 +33,8 @@ const ROWS: { caps: Cap[] }[] = [
 const U = 1.0; // one key unit
 const GAP = 0.16; // airy gaps: every cap reads as its own object
 const TRAVEL = 0.22; // how far a key sinks when hovered
-const CAP_H = 0.62; // tall, chunky, nearly cubic caps
+const BASE = U - GAP; // a 1u cap footprint
+const CAP_H = HEIGHT_RATIO * BASE; // his cap proportions exactly
 
 /* Uniform rows, no sculpt: the toy-like grid reads cleaner at product scale
    than a realistic Cherry profile ever did. */
@@ -76,45 +78,6 @@ function buildLayout() {
   }
 
   return { placed, width: hi - lo, depth: (ROWS.length - 1) * U + (U - GAP) };
-}
-
-/* ---------------------------------------------------------------------------
-   Keycap geometry
-
-   A rounded box is a cube with soft edges - it does not read as a keycap. Two
-   vertex passes fix that: a taper so the cap narrows toward the top, and a
-   dish so the top face is scooped instead of flat.
-   --------------------------------------------------------------------------- */
-
-const DISH = 0.024;
-
-function makeCapGeometry(w: number, d: number) {
-  const g = new RoundedBoxGeometry(w, CAP_H, d, 7, 0.12);
-  const pos = g.attributes.position as THREE.BufferAttribute;
-  const v = new THREE.Vector3();
-
-  for (let i = 0; i < pos.count; i++) {
-    v.fromBufferAttribute(pos, i);
-    const t = THREE.MathUtils.clamp(v.y / CAP_H + 0.5, 0, 1); // 0 base, 1 top
-
-    const taper = 1 - 0.26 * t * t;
-    v.x *= taper;
-    v.z *= taper;
-
-    if (t > 0.8) {
-      // radial falloff from the centre of the top face
-      const rx = v.x / (w * 0.5);
-      const rz = v.z / (d * 0.5);
-      const r = Math.min(1, rx * rx + rz * rz);
-      v.y -= DISH * (1 - r) * ((t - 0.8) / 0.2);
-    }
-
-    pos.setXYZ(i, v.x, v.y, v.z);
-  }
-
-  pos.needsUpdate = true;
-  g.computeVertexNormals();
-  return g;
 }
 
 /* ---------------------------------------------------------------------------
@@ -333,6 +296,7 @@ const Key = memo(function Key({ cap, geometry, texture, active, onEnter, onLeave
     <group ref={group} position={[cap.x, baseY, cap.z]} rotation={[ROW_TILT[cap.row], 0, 0]}>
       <mesh
         geometry={geometry}
+        scale={BASE}
         castShadow
         onPointerOver={cap.label ? enter : undefined}
         onPointerOut={cap.label ? leave : undefined}
@@ -507,14 +471,8 @@ function Board({
     };
   }, []);
 
-  const geometries = useMemo(() => {
-    const cache = new Map<number, THREE.BufferGeometry>();
-    for (const p of placed) {
-      if (!cache.has(p.w)) cache.set(p.w, makeCapGeometry(p.capW, U - GAP));
-    }
-    return cache;
-  }, [placed]);
-  useEffect(() => () => geometries.forEach((g) => g.dispose()), [geometries]);
+  // One shared cap mesh for the whole board; per-cap width comes from scale.
+  const capMesh = useKeycapGeometry();
 
   const textures = useMemo(() => {
     void fontsReady;
@@ -592,7 +550,7 @@ function Board({
           <Key
             key={`${cap.label}|${i}`}
             cap={cap}
-            geometry={geometries.get(cap.w)!}
+            geometry={capGeometry(capMesh, cap.capW / BASE)}
             texture={textures.get(cap.label) ?? null}
             active={active === cap.label}
             onEnter={enter}

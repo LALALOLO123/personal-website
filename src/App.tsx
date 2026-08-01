@@ -323,7 +323,17 @@ export default function App() {
 
         <footer className="footer">
           <span>&copy; 2026 {profile.name}</span>
-          <span>WebGL &middot; no template</span>
+          <span>
+            WebGL &middot; no template &middot; keycap mesh from{" "}
+            <a
+              href="https://github.com/Naresh-Khatri/3d-portfolio"
+              target="_blank"
+              rel="noreferrer"
+              data-cursor="hover"
+            >
+              Naresh Khatri
+            </a>
+          </span>
         </footer>
       </div>
     </>

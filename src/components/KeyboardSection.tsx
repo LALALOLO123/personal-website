@@ -16,10 +16,6 @@ import SkillField from "./SkillField";
    it when the section is actually approaching keeps the hero instant for
    anyone who never scrolls this far. */
 const Keyboard3D = lazy(() => import("./Keyboard3D"));
-/* ?spline swaps in Naresh Khatri's scene file for side-by-side comparison. */
-const SplineKeyboard = lazy(() => import("./SplineKeyboard"));
-const useSpline = () =>
-  typeof window !== "undefined" && new URLSearchParams(window.location.search).has("spline");
 
 function webglAvailable() {
   try {
@@ -93,11 +89,7 @@ export default function KeyboardSection({
         {load ? (
           <ErrorBoundary onError={() => setFailed(true)}>
             <Suspense fallback={<KeyboardSkeleton />}>
-              {useSpline() ? (
-                <SplineKeyboard />
-              ) : (
-                <Keyboard3D paused={!visible} progress={reduce ? undefined : progress} onLit={onLit} />
-              )}
+              <Keyboard3D paused={!visible} progress={reduce ? undefined : progress} onLit={onLit} />
             </Suspense>
           </ErrorBoundary>
         ) : (
