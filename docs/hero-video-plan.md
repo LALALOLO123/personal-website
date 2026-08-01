@@ -89,16 +89,62 @@ Continuity between hold and both segments is guaranteed by construction.
 4. Van: normal drive-by, right-to-left, moving-wipe reveal.
 5. After black: keyboard segment, keyboard white.
 
-## Still open (ask before generating)
+## Decided (Brian, 2026-08-01) — brief is now closed
 
-- Blackout mechanic: in-video hand-over-lens vs hybrid (CSS pull synced to
-  video end). Lean: in-video + CSS-black catch.
-- Hold state: frozen keyframe vs living loop (extra generation + loop risk).
-  Lean: frozen.
-- Mobile: center-crop the 16:9 video vs static keyframe + simple entrance.
-  (Separate 9:16 shoot doubles generation work.)
-- Robot: neutral industrial white/gray, or a brand-color accent?
-- Sound: silent-only vs sound-on toggle with city ambience.
-- Budget: trial vs credit pack vs free-only keyframe drafts.
-- Confirm: this replaces the "Building things that hold up." hero; normal
-  scrolling resumes after the black lands.
+| question | decision |
+|---|---|
+| Blackout | In-video pull to black, with a CSS black catching the join. Built. |
+| Hold state | **Living loop.** Ambient motion, frozen camera and letters. |
+| Mobile | Centre-crop the 16:9. No portrait shoot. |
+| Robot | Neutral industrial grey/off-white. No brand accent. |
+| Sound | Silent. `generate_audio: false`. |
+| Budget | Plus plan, purchased. |
+| Replaces old hero | Yes — done, the typographic hero is deleted. |
+
+## What to generate — four assets, in this order
+
+Everything anchors to ONE keyframe. Generate it first and do not move on
+until the spelling, material and light are right; every other asset is
+conditioned on it, so a flaw here is a flaw in all of them.
+
+**1. Keyframe (image).** Downtown street, daytime, street-level locked camera.
+BRIAN FU standing on the asphalt as oversized freestanding slab-serif letters:
+smooth painted composite, glossy white, rounded edges, chest-to-head height,
+the I-LOVE-NY / AMSTERDAM public-art genre. Iterate here — image models garble
+lettering on the first pass.
+
+**2. Hold loop (video).** `start_image = end_image = keyframe`.
+
+> Setting BOTH ends to the keyframe is the trick that makes a loop safe. It
+> forces the model to return to the exact frame it began on, so the loop point
+> is seamless AND both joins to the neighbouring clips still match. A loop
+> generated any other way has to be crossfaded and will drift.
+
+Ambient only: distant traffic crossing far background, light shifting, a flag
+or foliage moving. **The camera does not move. The letters do not move.**
+4-6 seconds.
+
+**3. Intro (video).** `end_image = keyframe`, start from the same street empty.
+Two or three ordinary cars pass, then a white van crosses right-to-left as a
+moving wipe — the street ahead of it empty, BRIAN FU standing in its wake, so
+the name completes left-to-right as the van exits frame. No morphing, no
+sparkle: the van passed and now they are there.
+
+**4. Exit (video).** `start_image = keyframe`. A grounded industrial humanoid —
+matte grey and off-white, scuffed, visible actuators, real weight, no chrome —
+steps out from behind the letters, walks to camera, reaches over the lens and
+pulls down. **Ends on full black.** The keyboard section opens on its own 2.4s
+blackout, so a black final frame cuts into it with nothing to match.
+
+### Constraints that apply to all four
+
+- **Locked-off camera.** Every clip.
+- **Keep BRIAN FU and the robot centred** enough that a 9:16 centre-crop still
+  reads — that is the entire mobile strategy.
+- 16:9, silent, and small enough to autoplay without stalling.
+
+## Where they go
+
+`public/reels/hero-intro.mp4`, `hero-hold.mp4`, `hero-exit.mp4`, and the
+keyframe at `public/shots/hero-keyframe.jpg`. Each is optional and the
+sequence degrades cleanly without it, so they can land one at a time.

@@ -1428,6 +1428,7 @@ html {
 }
 /* the still is the resting state; clips sit over it while they run */
 .film__clip { opacity: 0; transition: opacity 0.25s linear; }
+.film--hold  .film__clip--hold  { opacity: 1; }
 .film--intro .film__clip--intro { opacity: 1; }
 .film--exit .film__clip--exit  { opacity: 1; }
 
