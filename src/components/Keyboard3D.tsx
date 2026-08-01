@@ -237,7 +237,10 @@ const DARKWAY = { cap: "#26262c", hover: "#3a3a44", mute: "#d5d1c8", case: "#171
 const WHITEWAY = { cap: "#f1efe9", hover: "#ffffff", mute: "#7a766c", case: "#e6e3dc", plate: "#cfccc4", capRough: 0.3, capMetal: 0.05 };
 /* candy: each cap wears its brand colour with a white legend; the case goes
    near-black soap-bar. Blanks and the spacebar stay charcoal fillers. */
-const CANDYWAY = { cap: "#2b2b31", hover: "#3a3a44", mute: "#e8e5de", case: "#1b1b20", plate: "#101014", capRough: 0.38, capMetal: 0.05 };
+/* Satin, not gloss: at roughness 0.38 the lamp threw a broad specular sheen
+   across each top face and the near caps washed out to pastel. A rougher,
+   non-metallic cap keeps the brand colour instead of the highlight. */
+const CANDYWAY = { cap: "#2b2b31", hover: "#3a3a44", mute: "#e8e5de", case: "#1b1b20", plate: "#101014", capRough: 0.54, capMetal: 0 };
 const WAY = KB_VARIANT === "white" ? WHITEWAY : KB_VARIANT === "candy" ? CANDYWAY : DARKWAY;
 
 const CAP_COLOR = WAY.cap;
@@ -257,15 +260,47 @@ function legibleHex(hex: string): string {
   return luminance(hex) > 0.62 ? "#26262c" : hex;
 }
 
-/** Candy cap colour: the brand hex, darkened a touch when it is too pale to
- *  hold a white legend, and lifted when it is near-black. */
-function candyCap(label: string): string {
-  const hex = LEGENDS[label]?.hex ?? "#4a4a52";
+/** The charcoal every cap falls back to. */
+const NEUTRAL = CANDYWAY.cap;
+
+/* legends.ts stores INK colours - picked so a mark stays visible on a pale
+   cap - which is not the same thing as the brand's colour. Where the two
+   differ, the real brand colour is given here, because the cap is what wears
+   it now. Anything without a brand of its own gets charcoal, the way the
+   original treats its modifier and symbol caps. */
+const CAP_TINT: Record<string, string> = {
+  Java: "#5382A1", // the classic Java blue
+  "Next.js": "#000000", // a black wordmark, so this lands on charcoal
+  Deno: "#000000", // white dino on black, likewise
+  Vite: "#646CFF",
+  LLVM: "#262D3A",
+  WebGL: "#990000",
+  "C#": "#512BD4", // the .NET purple it ships under
+  GLSL: "#5586A4", // OpenGL blue
+  LinkedIn: "#0A66C2",
+  SQL: NEUTRAL,
+  "REST APIs": NEUTRAL,
+  "Row-Level Security": NEUTRAL,
+  Email: NEUTRAL,
+  Sound: NEUTRAL,
+};
+
+/* A white mark needs a cap it can sit on. Outside this window - a near-black
+   brand like Vercel or GitHub, a near-white one like Unity or Deno, or a
+   yellow like JavaScript's - no amount of tinting saves it, so the cap goes
+   charcoal instead. Tinting the brand colour to force a fit is what made the
+   last pass look muddy; the original never does it. */
+const CAP_LUM_MIN = 0.05;
+const CAP_LUM_MAX = 0.62;
+
+/** The cap's colour: the brand's own, untouched, or charcoal when the brand
+ *  cannot carry a white legend. */
+function capColor(label: string, blank?: boolean): string {
+  if (blank) return NEUTRAL;
+  const hex = CAP_TINT[label] ?? LEGENDS[label]?.hex;
+  if (!hex) return NEUTRAL;
   const lum = luminance(hex);
-  const c = new THREE.Color(hex);
-  if (lum > 0.55) c.offsetHSL(0, 0.06, -0.2);
-  if (lum < 0.08) c.offsetHSL(0, 0, 0.14);
-  return `#${c.getHexString()}`;
+  return lum < CAP_LUM_MIN || lum > CAP_LUM_MAX ? NEUTRAL : hex;
 }
 
 type KeyProps = {
@@ -288,17 +323,18 @@ const Key = memo(function Key({ cap, geometry, texture, active, onEnter, onLeave
 
   const baseY = ROW_LIFT[cap.row];
 
-  // Resting legends sit slightly back from full saturation so the board reads
-  // as one object; hovering brings the mark to its true brand colour.
+  // Resting legends sit slightly back from full brightness so the board reads
+  // as one object; hovering brings the mark all the way up.
   const [rest, brand, capRest, capHover] = useMemo(() => {
-    if (KB_VARIANT === "candy" && !cap.blank) {
-      const base = new THREE.Color(candyCap(cap.label));
-      // Pick the mark colour off the cap it sits on. A fixed white legend
-      // vanished on the pale caps; this guarantees contrast on every key.
-      const pale = 0.2126 * base.r + 0.7152 * base.g + 0.0722 * base.b > 0.42;
-      const mark = new THREE.Color(pale ? "#17171b" : "#ffffff");
+    if (KB_VARIANT === "candy") {
+      const base = new THREE.Color(capColor(cap.label, cap.blank));
       const hover = base.clone().offsetHSL(0, 0.02, 0.09);
-      return [mark.clone().multiplyScalar(pale ? 1 : 0.92), mark, base, hover];
+      // ONE ink colour for the whole board. Switching the mark between white
+      // and black to chase contrast made the board look like two keyboards
+      // shuffled together; capColor guarantees every cap can hold white, so
+      // the ink never has to move.
+      const mark = new THREE.Color("#ffffff");
+      return [mark.clone().multiplyScalar(cap.blank ? 0.6 : 0.88), mark, base, hover];
     }
     const b = new THREE.Color(legibleHex(cap.blank ? (KB_VARIANT === "dark" ? "#9a958a" : "#8a8578") : LEGENDS[cap.label]?.hex ?? "#d5d1c8"));
     return [b.clone().lerp(LEGEND_MUTE, 0.28), b, CAP_REST, CAP_HOVER];
@@ -563,10 +599,17 @@ function Board({
       }
     }
     STAGE.lamp = lamp;
-    if (spotRef.current) spotRef.current.intensity = 880 * lamp;
-    if (ambRef.current) ambRef.current.intensity = 0.34 * lamp;
-    if (fillRef.current) fillRef.current.intensity = 0.6 * lamp;
-    if (rimRef.current) rimRef.current.intensity = 0.62 * lamp;
+    /* The old 880 was set when the legends were dark ink on pale caps and
+       needed all the help they could get. It put roughly 15 units of
+       irradiance on the board - but a saturated cap clips once its brightest
+       channel passes ~3, so every top face bleached to pastel while the side
+       faces (which the lamp rakes) kept the real colour. The legends are unlit
+       and tone-mapping-exempt, so they stay readable however far this drops;
+       only the caps care. */
+    if (spotRef.current) spotRef.current.intensity = 300 * lamp;
+    if (ambRef.current) ambRef.current.intensity = 0.55 * lamp;
+    if (fillRef.current) fillRef.current.intensity = 0.45 * lamp;
+    if (rimRef.current) rimRef.current.intensity = 0.5 * lamp;
 
     // -- board: flat and near the lens, then it recedes as it stands up --
     // Smootherstep (Perlin): 6x^5 - 15x^4 + 10x^3. Velocity AND acceleration
@@ -657,10 +700,15 @@ function Board({
 
       {/* the studio rig: everything starts dark and the sequence ramps it */}
       <ambientLight ref={ambRef} intensity={0} color="#dfe3ea" />
+      {/* Further from the board and swung toward the camera. Inverse-square
+          falloff is much flatter when the lamp is far relative to the object,
+          and the board stands nearly upright in its final pose - lighting it
+          from almost directly overhead scorched the top row and starved the
+          bottom one. */}
       <spotLight
         ref={spotRef}
-        position={[0.5, 15, 5]}
-        angle={0.62}
+        position={[1.5, 14, 13]}
+        angle={0.6}
         penumbra={0.9}
         intensity={0}
         decay={1.6}
@@ -746,7 +794,10 @@ export default function Keyboard3D({
         gl={{ alpha: true, antialias: true }}
         onCreated={({ gl }) => {
           gl.toneMapping = THREE.ACESFilmicToneMapping;
-          gl.toneMappingExposure = 1.25;
+          // ACES desaturates as it rolls off, so an over-lit cap does not just
+          // get brighter, it goes pale. Backing the exposure off keeps the
+          // brand colours where they belong.
+          gl.toneMappingExposure = 1.02;
         }}
       >
         {/* Black studio from the reference photo. The void and the visible
