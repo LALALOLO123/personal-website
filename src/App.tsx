@@ -1,7 +1,10 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { lazy, Suspense, useEffect, useRef, useState, type ReactNode } from "react";
 import { motion, useReducedMotion, type Variants } from "motion/react";
 import "./App.css";
 import Cursor from "./components/Cursor";
+// Smoke tests only. Lazy, so three.js never reaches the main chunk.
+const WorkScene = lazy(() => import("./components/WorkScene"));
+import type { WorkVariant } from "./components/WorkScene";
 import KeyboardSection from "./components/KeyboardSection";
 import { SplitText, ShinyText, Magnetic } from "./components/Bits";
 import { useSectionNav } from "./hooks/useSectionNav";
@@ -147,6 +150,7 @@ function ArtifactScene({ active }: { active: boolean }) {
   const reduce = useReducedMotion();
   const state = active || reduce ? "show" : "hidden";
   const cardRef = useRef<HTMLAnchorElement>(null);
+  const variant = new URLSearchParams(location.search).get("work") as WorkVariant | null;
 
   const setSpot = (e: React.PointerEvent) => {
     const el = cardRef.current;
@@ -162,6 +166,11 @@ function ArtifactScene({ active }: { active: boolean }) {
         Selected work
       </motion.p>
 
+      {variant ? (
+        <Suspense fallback={null}>
+          <WorkScene variant={variant} />
+        </Suspense>
+      ) : (
       <div className="work">
 
       <motion.div className="work__lead" variants={rise} initial="hidden" animate={state} custom={1}>
@@ -226,6 +235,7 @@ function ArtifactScene({ active }: { active: boolean }) {
           ))}
         </ol>
       </div>
+      )}
 
       <motion.p className="artifact__aside" variants={rise} initial="hidden" animate={state} custom={3}>
         All of it is on{" "}
@@ -297,6 +307,7 @@ export default function App() {
   const reduce = useReducedMotion();
   // Reduced motion keeps native scrolling; hijacking it would be hostile.
   const { index, goTo } = useSectionNav(SECTIONS.length, !reduce);
+  const workVariant = new URLSearchParams(location.search).get("work");
   const [sound, setSound] = useState(soundEnabled());
 
   return (
@@ -358,7 +369,7 @@ export default function App() {
           <KeyboardScene active={index === 1} />
         </Panel>
 
-        <Panel id="work" active={index === 2}>
+        <Panel id="work" active={index === 2} className={workVariant ? "panel--work" : ""}>
           <ArtifactScene active={index === 2} />
         </Panel>
 

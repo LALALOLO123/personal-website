@@ -1080,3 +1080,35 @@ html {
     margin-top: 0.45rem;
   }
 }
+
+/* smoke-test stage for the work section variants */
+.workscene {
+  position: absolute;
+  inset: 0;
+}
+/* the variants are all dark-studio pieces, so the panel goes dark with them */
+.panel--work {
+  background: #050505;
+  --ink: #ece9e2;
+  --ink-dim: #8f8b82;
+  --line: rgba(236, 233, 226, 0.14);
+}
+.panel--work .section {
+  position: static;
+}
+.panel--work .section__label {
+  position: absolute;
+  top: 8vh;
+  left: min(5vw, 3rem);
+  z-index: 2;
+}
+.panel--work .artifact__aside {
+  position: absolute;
+  bottom: 6vh;
+  left: min(5vw, 3rem);
+  z-index: 2;
+  margin: 0;
+}
+.workscene canvas {
+  display: block;
+}
