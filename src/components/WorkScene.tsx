@@ -1,8 +1,7 @@
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
-import { Text3D } from "@react-three/drei";
+import { Text3D, useGLTF } from "@react-three/drei";
 import * as THREE from "three";
-import { RoundedBoxGeometry } from "three-stdlib";
 import { brandLogo } from "../data/legendGeometry";
 import { projects, flagship } from "../data/content";
 import { LEGENDS } from "../data/legends";
@@ -43,17 +42,25 @@ const FACE: Record<string, string> = {
   CarStatus: "JavaScript",
 };
 
-const SCREEN_W = 9.4;
-const SCREEN_H = 5.29; // 16:9
+const SCREEN_W = 16;
+const SCREEN_H = 9;
 
 /* Depth is the whole composition here. Everything used to sit far too near
    the lens - the projector filled the frame and the rack fell off the bottom
    entirely. Screen upstage, projector mid, rack downstage, and the camera far
    enough back that all three are in one shot. */
-const SCREEN_Z = -2.4;
-const PROJ_Z = 1.9;
-const RACK_Y = -1.2;
-const RACK_Z = 4.6;
+const SCREEN_Z = -3.0;
+/** The screen prop, floor to top of the tripod. */
+const SCREEN_TALL = 8.2;
+/** The projector, along its longest axis. */
+const PROJ_LONG = 3.4;
+/** The image on the fabric. Slightly inside it, the way a real throw is. */
+const REEL_W = 4.4;
+const PROJ_Z = 3.2;
+/** Off to one side, so it is not a silhouette against its own screen. */
+const PROJ_X = 2.9;
+const RACK_Y = -0.92;
+const RACK_Z = 5.6;
 
 /* ------------------------------- the screen ------------------------------- */
 
@@ -138,10 +145,10 @@ function useReel(item: Item) {
 
 function Screen({ item }: { item: Item }) {
   const tex = useReel(item);
+  const [w, setW] = useState(REEL_W);
   const mat = useRef<THREE.MeshBasicMaterial>(null);
   const fade = useRef(0);
 
-  // the lamp catching after a reel change
   useEffect(() => {
     fade.current = 0;
   }, [item]);
@@ -151,60 +158,137 @@ function Screen({ item }: { item: Item }) {
   });
 
   return (
-    <group position={[0, 2.95, SCREEN_Z]}>
-      {/* the surround, so the bright frame has an edge to sit in */}
-      <mesh position={[0, 0, -0.08]}>
-        <planeGeometry args={[SCREEN_W + 0.5, SCREEN_H + 0.5]} />
-        <meshStandardMaterial color="#0a0a0c" roughness={1} />
-      </mesh>
+    <ScreenProp onSurface={(s) => setW(s.x * 0.88)}>
       {tex && (
         <mesh>
-          <planeGeometry args={[SCREEN_W, SCREEN_H]} />
+          <planeGeometry args={[w, w / (16 / 9)]} />
           <meshBasicMaterial ref={mat} map={tex} transparent toneMapped={false} />
         </mesh>
+      )}
+    </ScreenProp>
+  );
+}
+
+/* ----------------------------- the props -------------------------------- */
+/* Scanned models from Poly Haven (CC0), not primitives. The projector even
+   has its spools as separate nodes, so they can actually turn, and the reels
+   in the rack are clones of its own feed spool - the machine and its film
+   are literally the same object. */
+
+const PROJECTOR_URL = "/models/filmstrip_projector_8mm/filmstrip_projector_8mm.gltf";
+const SCREEN_URL = "/models/projector_screen/projector_screen.gltf";
+useGLTF.preload(PROJECTOR_URL);
+useGLTF.preload(SCREEN_URL);
+
+/** Fit a loaded model to a target size on its longest axis, sitting on y=0. */
+function fitToGround(obj: THREE.Object3D, target: number) {
+  const box = new THREE.Box3().setFromObject(obj);
+  const size = new THREE.Vector3();
+  const mid = new THREE.Vector3();
+  box.getSize(size);
+  box.getCenter(mid);
+  const s = target / Math.max(size.x, size.y, size.z);
+  obj.scale.setScalar(s);
+  obj.position.set(-mid.x * s, -box.min.y * s, -mid.z * s);
+  return { size: size.multiplyScalar(s) };
+}
+
+function ScreenProp({
+  children,
+  onSurface,
+}: {
+  children?: React.ReactNode;
+  onSurface?: (size: THREE.Vector3) => void;
+}) {
+  const { scene } = useGLTF(SCREEN_URL);
+  const model = useMemo(() => {
+    const c = scene.clone(true);
+    fitToGround(c, SCREEN_TALL);
+    // Box3.setFromObject reads WORLD matrices; straight after a clone and
+    // rescale those are stale, so the surface gets measured in the model's
+    // original space and the reel lands somewhere near the tripod.
+    c.updateMatrixWorld(true);
+    return c;
+  }, [scene]);
+
+  /* Where the reel goes: measured off the mesh that carries the screen
+     material, rather than guessed, so it lands on the fabric and not on the
+     frame or the tripod. */
+  const surface = useMemo(() => {
+    let box: THREE.Box3 | null = null;
+    model.traverse((o) => {
+      const m = o as THREE.Mesh;
+      const mat = m.material as THREE.Material | undefined;
+      if (m.isMesh && mat && /screen/i.test(mat.name) && !/frame/i.test(mat.name)) {
+        const b = new THREE.Box3().setFromObject(m);
+        box = box ? box.union(b) : b;
+      }
+    });
+    if (!box) return null;
+    const size = new THREE.Vector3();
+    const mid = new THREE.Vector3();
+    (box as THREE.Box3).getSize(size);
+    (box as THREE.Box3).getCenter(mid);
+    return { size, mid };
+  }, [model]);
+
+  useEffect(() => {
+    if (surface) onSurface?.(surface.size);
+  }, [surface, onSurface]);
+
+  return (
+    <group position={[0, -1.5, SCREEN_Z]}>
+      <primitive object={model} />
+      {surface && (
+        <group position={[surface.mid.x, surface.mid.y, surface.mid.z + 0.02]}>
+          {children}
+        </group>
       )}
     </group>
   );
 }
 
-/* ----------------------------- the projector ------------------------------ */
-
 function Projector({ on }: { on: boolean }) {
-  const body = useMemo(() => new RoundedBoxGeometry(1.7, 0.95, 2.3, 4, 0.12), []);
+  const { scene } = useGLTF(PROJECTOR_URL);
+  const spools = useRef<THREE.Object3D[]>([]);
   const spot = useRef<THREE.SpotLight>(null);
   const lamp = useRef(0);
 
+  const model = useMemo(() => {
+    const c = scene.clone(true);
+    fitToGround(c, PROJ_LONG);
+    const found: THREE.Object3D[] = [];
+    c.traverse((o) => {
+      if (/spool_(feed|takeup)/i.test(o.name)) found.push(o);
+      const m = o as THREE.Mesh;
+      if (m.isMesh) {
+        m.castShadow = true;
+        m.receiveShadow = true;
+      }
+    });
+    spools.current = found;
+    return c;
+  }, [scene]);
+
   useFrame((_, dt) => {
-    // a lamp does not fade, it catches - fast up, with a stutter
+    // a lamp catches rather than fades
     lamp.current += ((on ? 1 : 0) - lamp.current) * (1 - Math.exp(-dt * 9));
-    if (spot.current) spot.current.intensity = 55 * lamp.current;
+    if (spot.current) spot.current.intensity = 42 * lamp.current;
+    // and the spools turn while it runs
+    for (const s of spools.current) s.rotation.z -= dt * 5.5 * lamp.current;
   });
 
   return (
-    <group position={[0, -0.62, PROJ_Z]}>
-      <mesh geometry={body} castShadow>
-        <meshStandardMaterial color="#24242a" roughness={0.45} metalness={0.5} />
-      </mesh>
-      {/* lens */}
-      <mesh position={[0, 0.02, -1.25]} rotation={[Math.PI / 2, 0, 0]} castShadow>
-        <cylinderGeometry args={[0.3, 0.37, 0.55, 28]} />
-        <meshStandardMaterial color="#131317" roughness={0.3} metalness={0.7} />
-      </mesh>
-      {/* feed and take-up spools, because it should read as a projector */}
-      {[-0.45, 0.45].map((x) => (
-        <mesh key={x} position={[x, 0.62, 0.1]} rotation={[Math.PI / 2, 0, 0]} castShadow>
-          <cylinderGeometry args={[0.42, 0.42, 0.1, 24]} />
-          <meshStandardMaterial color="#2e2e36" roughness={0.5} metalness={0.4} />
-        </mesh>
-      ))}
+    <group position={[PROJ_X, -1.5, PROJ_Z]} rotation={[0, Math.PI - 0.34, 0]}>
+      <primitive object={model} />
       <spotLight
         ref={spot}
-        position={[0, 0.02, -1.4]}
-        target-position={[0, 3.4, -7]}
-        angle={0.42}
+        position={[0, 0.75, -0.6]}
+        target-position={[0, 3.4, 9]}
+        angle={0.4}
         penumbra={0.55}
         intensity={0}
-        distance={20}
+        distance={22}
         color="#eaf0ff"
       />
     </group>
@@ -226,12 +310,37 @@ function Cartridge({
 }) {
   const g = useRef<THREE.Group>(null);
   const [hot, setHot] = useState(false);
-  const shell = useMemo(() => new RoundedBoxGeometry(1.9, 0.28, 1.25, 4, 0.07), []);
+  /* A reel, cloned from the projector's own feed spool - the machine and its
+     film are literally the same asset, and it is real geometry rather than a
+     cylinder pretending. */
+  const { scene: projScene } = useGLTF(PROJECTOR_URL);
+  const reel = useMemo(() => {
+    let src: THREE.Object3D | null = null;
+    projScene.traverse((o) => {
+      if (!src && /spool_feed/i.test(o.name)) src = o;
+    });
+    if (!src) return null;
+    const c = (src as THREE.Object3D).clone(true);
+    c.position.set(0, 0, 0);
+    c.rotation.set(0, 0, 0);
+    const box = new THREE.Box3().setFromObject(c);
+    const size = new THREE.Vector3();
+    box.getSize(size);
+    c.scale.setScalar(1.15 / Math.max(size.x, size.y, size.z));
+    c.traverse((o) => {
+      const m = o as THREE.Mesh;
+      if (m.isMesh) {
+        m.castShadow = true;
+        m.receiveShadow = true;
+      }
+    });
+    return c;
+  }, [projScene]);
   const [, bump] = useState(0);
   const parts = brandLogo(LEGENDS[item.face]?.logo, () => bump((n) => n + 1));
 
   const home = useMemo<[number, number, number]>(
-    () => [(slot - 1.5) * 2.35, RACK_Y, RACK_Z],
+    () => [-3.6 + slot * 2.4, RACK_Y, RACK_Z],
     [slot]
   );
   const target = useMemo(() => new THREE.Vector3(), []);
@@ -241,21 +350,21 @@ function Cartridge({
     // loaded rides on top of the projector; the rest wait in the rack, and
     // lift a little when pointed at
     target.set(...home);
-    if (loaded) target.set(0, 0.02, PROJ_Z);
-    else if (hot) target.y += 0.22;
+    if (loaded) target.set(PROJ_X - 0.35, -0.42, PROJ_Z - 0.1);
+    else if (hot) target.y += 0.18;
 
     const k = 1 - Math.exp(-dt * 7);
     g.current.position.lerp(target, k);
-    const tilt = loaded ? 0 : -0.28;
+    const tilt = 0;
     g.current.rotation.x += (tilt - g.current.rotation.x) * k;
   });
 
   return (
-    <group ref={g} position={home} rotation={[-0.28, 0, 0]}>
+    <group ref={g} position={home}>
+      {/* an invisible slab carries the pointer events: the spool geometry is
+          fiddly to hit and a reel you cannot click is worse than an ugly one */}
       <mesh
-        geometry={shell}
-        castShadow
-        receiveShadow
+        visible={false}
         onPointerOver={(e) => {
           e.stopPropagation();
           setHot(true);
@@ -266,16 +375,13 @@ function Cartridge({
           onPick();
         }}
       >
-        <meshStandardMaterial
-          color={loaded ? "#3a3a44" : hot ? "#2f2f38" : "#1e1e24"}
-          roughness={0.55}
-          metalness={0.3}
-        />
+        <boxGeometry args={[1.7, 0.7, 1.7]} />
       </mesh>
+      {reel && <primitive object={reel} rotation={[Math.PI / 2, 0, 0]} />}
 
-      {/* the label: the project's tech mark, lying on the cartridge face */}
+      {/* the project's mark, set into the reel hub */}
       {parts && (
-        <group position={[-0.62, 0.16, 0]} rotation={[-Math.PI / 2, 0, 0]} scale={0.42}>
+        <group position={[0, 0.02, 0.28]} scale={0.34}>
           {parts.map((p, i) => (
             <mesh key={i} geometry={p.geo}>
               <meshStandardMaterial color={p.color} roughness={0.4} metalness={0.1} />
@@ -283,8 +389,8 @@ function Cartridge({
           ))}
         </group>
       )}
-      <group position={[-0.3, 0.15, 0.12]} rotation={[-Math.PI / 2, 0, 0]}>
-        <Text3D font={FONT} size={0.145} height={0.02}>
+      <group position={[-0.62, -0.92, 0.1]}>
+        <Text3D font={FONT} size={0.16} height={0.03}>
           {item.title}
           <meshStandardMaterial color={hot || loaded ? "#ffffff" : "#8f9199"} roughness={0.5} />
         </Text3D>
@@ -338,12 +444,12 @@ export default function WorkScene({ onSelect }: { onSelect: (i: Item) => void })
       <Canvas
         shadows
         dpr={[1, 1.75]}
-        camera={{ position: [0, 3.8, 15.2], fov: 38 }}
+        camera={{ position: [0, 4.4, 17.5], fov: 38 }}
         gl={{ alpha: true, antialias: true }}
         onCreated={({ gl, camera }) => {
           gl.toneMapping = THREE.ACESFilmicToneMapping;
           gl.toneMappingExposure = 1.0;
-          camera.lookAt(0, 1.2, 0);
+          camera.lookAt(0, 1.5, 0);
         }}
       >
         <ambientLight intensity={0.32} color="#c9d2e2" />

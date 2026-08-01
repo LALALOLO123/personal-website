@@ -222,7 +222,17 @@ function Contact({ active }: { active: boolean }) {
             data-cursor="hover"
           >
             Naresh Khatri
-          </a>
+          </a>{" "}
+          &middot; projector and screen from{" "}
+          <a
+            href="https://polyhaven.com"
+            target="_blank"
+            rel="noreferrer"
+            data-cursor="hover"
+          >
+            Poly Haven
+          </a>{" "}
+          (CC0)
         </span>
       </footer>
     </div>
