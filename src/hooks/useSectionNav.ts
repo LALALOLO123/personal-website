@@ -25,6 +25,19 @@ function ease(t: number) {
   return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 }
 
+/** Where a section actually starts.
+ *
+ *  Measured off the element rather than computed as index * innerHeight.
+ *  Going fullscreen fires `resize` BEFORE the 100svh panels have reflowed, so
+ *  the computed offset is a viewport stale at exactly the moment it is used -
+ *  the page lands part way between two panels and you get one section filling
+ *  most of the screen with a band of the next below it. Reading offsetTop is
+ *  always right, whatever the layout is doing. */
+function sectionTop(i: number) {
+  const el = document.querySelectorAll<HTMLElement>(".panel")[i];
+  return el ? el.offsetTop : i * window.innerHeight;
+}
+
 export function useSectionNav(count: number, enabled: boolean) {
   const [index, setIndex] = useState(0);
   const busy = useRef(false);
@@ -35,7 +48,7 @@ export function useSectionNav(count: number, enabled: boolean) {
     (target: number, animate = true) => {
       const i = Math.max(0, Math.min(count - 1, target));
       const from = window.scrollY;
-      const to = i * window.innerHeight;
+      const to = sectionTop(i);
       if (i === indexRef.current && Math.abs(from - to) < 2) return;
 
       setIndex(i);
@@ -97,8 +110,17 @@ export function useSectionNav(count: number, enabled: boolean) {
       goTo(indexRef.current + (dy > 0 ? 1 : -1));
     };
 
-    // Keep the index honest if anything else moves the page (anchor, refresh).
-    const onResize = () => goTo(indexRef.current, false);
+    /* Keep the index honest if anything else moves the page (anchor, refresh,
+       going fullscreen). Deferred two frames rather than run on the event:
+       resize fires before the panels have been laid out at the new height, so
+       realigning immediately just snaps to the OLD geometry. */
+    let raf = 0;
+    const onResize = () => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() =>
+        requestAnimationFrame(() => goTo(indexRef.current, false))
+      );
+    };
 
     window.addEventListener("wheel", onWheel, { passive: false });
     window.addEventListener("keydown", onKey);
@@ -106,6 +128,9 @@ export function useSectionNav(count: number, enabled: boolean) {
     window.addEventListener("touchmove", onTouchMove, { passive: false });
     window.addEventListener("touchend", onTouchEnd);
     window.addEventListener("resize", onResize);
+    // Fullscreen does not always emit a plain resize; these do.
+    document.addEventListener("fullscreenchange", onResize);
+    window.visualViewport?.addEventListener("resize", onResize);
     return () => {
       window.removeEventListener("wheel", onWheel);
       window.removeEventListener("keydown", onKey);
@@ -113,6 +138,9 @@ export function useSectionNav(count: number, enabled: boolean) {
       window.removeEventListener("touchmove", onTouchMove);
       window.removeEventListener("touchend", onTouchEnd);
       window.removeEventListener("resize", onResize);
+      document.removeEventListener("fullscreenchange", onResize);
+      window.visualViewport?.removeEventListener("resize", onResize);
+      cancelAnimationFrame(raf);
     };
   }, [enabled, goTo, count]);
 

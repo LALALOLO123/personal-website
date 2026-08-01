@@ -4,7 +4,7 @@
 }
 
 .shell {
-  width: min(1180px, 90vw);
+  width: min(1560px, 92vw);
   margin: 0 auto;
 }
 
@@ -93,7 +93,7 @@
   font-weight: 400;
   line-height: 0.92;
   letter-spacing: -0.01em;
-  font-size: clamp(3.4rem, 14vw, 12rem);
+  font-size: clamp(3.4rem, 13vw, 19rem);
   text-wrap: balance;
 }
 .hero__title em {
@@ -102,8 +102,8 @@
 }
 .hero__sub {
   margin-top: 2.2rem;
-  max-width: 46ch;
-  font-size: clamp(1rem, 1.4vw, 1.2rem);
+  max-width: 52ch;
+  font-size: clamp(1rem, 1.15vw, 1.6rem);
   line-height: 1.7;
   color: var(--ink-dim);
 }
@@ -533,7 +533,7 @@
 }
 .artifact__title {
   font-family: var(--font-display);
-  font-size: clamp(2.2rem, 6vw, 3.6rem);
+  font-size: clamp(2.2rem, 5vw, 5.4rem);
   line-height: 1;
 }
 .artifact__live {
@@ -800,7 +800,7 @@
 .contact__title {
   font-family: var(--font-display);
   font-weight: 400;
-  font-size: clamp(3.4rem, 9vw, 7rem);
+  font-size: clamp(3.4rem, 8.5vw, 11rem);
   line-height: 1;
   margin-bottom: 3rem;
 }
