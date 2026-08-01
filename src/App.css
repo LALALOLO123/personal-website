@@ -1117,9 +1117,11 @@ html {
 .reelnote {
   position: absolute;
   left: min(5vw, 3rem);
-  bottom: 14vh;
+  /* the left gutter, clear of both the projection and the name row - it was
+     sitting directly under the active title */
+  top: 21vh;
+  max-width: 21ch;
   z-index: 2;
-  max-width: 34ch;
   pointer-events: none;
 }
 .reelnote__meta {
