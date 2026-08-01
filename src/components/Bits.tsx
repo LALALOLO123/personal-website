@@ -18,12 +18,17 @@ export function SplitText({
   delay = 0,
   stagger = 0.05,
   once = true,
+  play,
 }: {
   text: string;
   className?: string;
   delay?: number;
   stagger?: number;
   once?: boolean;
+  /** Drive the reveal explicitly instead of by intersection. Section panels
+   *  are all mounted at once and jumped between, so an IntersectionObserver
+   *  can miss the entry and leave the words stuck behind their mask. */
+  play?: boolean;
 }) {
   const reduce = useReducedMotion();
   if (reduce) return <span className={className}>{text}</span>;
@@ -37,8 +42,16 @@ export function SplitText({
           <motion.span
             style={{ display: "inline-block", paddingRight: "0.24em", willChange: "transform, filter" }}
             initial={{ y: "112%", opacity: 0, filter: "blur(7px)" }}
-            whileInView={{ y: 0, opacity: 1, filter: "blur(0px)" }}
-            viewport={{ once, margin: "-12%" }}
+            {...(play === undefined
+              ? {
+                  whileInView: { y: 0, opacity: 1, filter: "blur(0px)" },
+                  viewport: { once, margin: "-12%" },
+                }
+              : {
+                  animate: play
+                    ? { y: 0, opacity: 1, filter: "blur(0px)" }
+                    : { y: "112%", opacity: 0, filter: "blur(7px)" },
+                })}
             transition={{ duration: 0.85, ease, delay: delay + i * stagger }}
           >
             {word}

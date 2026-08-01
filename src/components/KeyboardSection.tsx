@@ -8,7 +8,7 @@ import {
   type ErrorInfo,
   type ReactNode,
 } from "react";
-import { useReducedMotion, type MotionValue } from "motion/react";
+import { useReducedMotion } from "motion/react";
 import SkillField from "./SkillField";
 
 /* three + react-three-fiber are ~215KB gzipped, which is more than the rest of
@@ -28,11 +28,12 @@ function webglAvailable() {
 
 export default function KeyboardSection({
   skills,
-  progress,
+  active = false,
   onLight,
 }: {
   skills: string[];
-  progress?: MotionValue<number>;
+  /** True while this is the section on screen; drives the reveal + rewind. */
+  active?: boolean;
   onLight?: (on: boolean) => void;
 }) {
   const hostRef = useRef<HTMLDivElement>(null);
@@ -89,7 +90,7 @@ export default function KeyboardSection({
         {load ? (
           <ErrorBoundary onError={() => setFailed(true)}>
             <Suspense fallback={<KeyboardSkeleton />}>
-              <Keyboard3D paused={!visible} progress={reduce ? undefined : progress} onLight={onLight} />
+              <Keyboard3D paused={!visible || !active} active={active && !reduce} onLight={onLight} />
             </Suspense>
           </ErrorBoundary>
         ) : (

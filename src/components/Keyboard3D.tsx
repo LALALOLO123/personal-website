@@ -1,5 +1,4 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { MotionValue } from "motion/react";
 import { Canvas, useFrame, useThree, type ThreeEvent } from "@react-three/fiber";
 import { Html } from "@react-three/drei";
 import * as THREE from "three";
@@ -461,18 +460,17 @@ function FitCamera({ width, depth }: { width: number; depth: number }) {
 
 function Board({
   onHover,
-  progress,
+  live = true,
   onLight,
   onSound,
   armed = true,
 }: {
   onHover: (label: string | null) => void;
-  /** Scroll progress of the pinned section. Crossing a small threshold ARMS
-   *  the sequence; from there everything runs on its own clock:
-   *  pitch black -> spotlight snaps on over the board lying flat -> half a
-   *  second of stillness -> the board tilts up into the reference pose.
-   *  Undefined means "skip the theatre, hold the final pose, lights on". */
-  progress?: MotionValue<number>;
+  /** True once this is the section on screen. Going true ARMS the sequence;
+   *  from there everything runs on its own clock: pitch black -> spotlight
+   *  snaps on over the board lying flat -> half a second of stillness -> the
+   *  board tilts up into the pose. False means "skip the theatre". */
+  live?: boolean;
   /** true when the lamp comes on, false when the scene resets to darkness;
    *  drives the CSS spotlight cone and the copy fade. */
   onLight?: (on: boolean) => void;
@@ -491,14 +489,14 @@ function Board({
   const ambRef = useRef<THREE.AmbientLight>(null);
   const fillRef = useRef<THREE.DirectionalLight>(null);
   const rimRef = useRef<THREE.DirectionalLight>(null);
-  const startAt = useRef<number | null>(progress ? null : -99); // null = waiting in the dark
-  const litFired = useRef(!progress);
+  const startAt = useRef<number | null>(live ? null : -99); // null = waiting in the dark
+  const litFired = useRef(!live);
 
   // Rewind when the section leaves. The board is snapped back to flat and
   // dark here rather than in useFrame, because the render loop is parked
   // while the section is off-screen and would never run the reset.
   useEffect(() => {
-    if (armed || !progress) return;
+    if (armed || !live) return;
     startAt.current = null;
     litFired.current = false;
     onLight?.(false);
@@ -507,7 +505,7 @@ function Board({
       g.quaternion.copy(FLAT_Q);
       g.position.copy(FLAT_POS);
     }
-  }, [armed, progress, onLight]);
+  }, [armed, live, onLight]);
 
   /* Timeline (seconds from trigger, wall-clock so frame stalls cannot slow
      the choreography - a dropped frame skips ahead instead of dragging):
@@ -526,7 +524,7 @@ function Board({
 
     if (startAt.current === null) {
       // still dark: armed only once the section is actually engaged
-      if (progress && progress.get() > 0.04) {
+      if (live) {
         startAt.current = now;
         if (!litFired.current) {
           litFired.current = true;
@@ -710,11 +708,11 @@ function Board({
 
 export default function Keyboard3D({
   paused = false,
-  progress,
+  active = true,
   onLight,
 }: {
   paused?: boolean;
-  progress?: MotionValue<number>;
+  active?: boolean;
   onLight?: (on: boolean) => void;
 }) {
   const [label, setLabel] = useState<string | null>(null);
@@ -738,7 +736,7 @@ export default function Keyboard3D({
             light cone are painted by the section CSS behind this transparent
             canvas; the scene contributes the lit board, floor pool, shadow.
             Lights live inside Board so the switch-on sequence can drive them. */}
-        <Board onHover={setLabel} progress={progress} onLight={onLight} onSound={setSound} armed={!paused} />
+        <Board onHover={setLabel} live={active} onLight={onLight} onSound={setSound} armed={active && !paused} />
       </Canvas>
 
       <p className="kb__caption" aria-live="polite">

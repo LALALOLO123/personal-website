@@ -1,126 +1,96 @@
 import { useRef, type ReactNode } from "react";
-import {
-  motion,
-  useScroll,
-  useSpring,
-  useTransform,
-  useReducedMotion,
-  type MotionValue,
-} from "motion/react";
+import { motion, useReducedMotion, type Variants } from "motion/react";
 import "./App.css";
 import Cursor from "./components/Cursor";
 import KeyboardSection from "./components/KeyboardSection";
 import { SplitText, ShinyText, Magnetic } from "./components/Bits";
+import { useSectionNav } from "./hooks/useSectionNav";
 import { profile, skills, flagship } from "./data/content";
 
 const ease = [0.16, 1, 0.3, 1] as const;
 
 /* ---------------------------------------------------------------------------
-   Pinned sections
+   Section-per-viewport
 
-   The page is a sequence of locked scenes, Apple-style: each section is a
-   tall scroll runway with a sticky viewport inside. While you scroll the
-   runway, the scene holds still and its animation scrubs with your progress;
-   when the animation completes, the section releases and the next one
-   arrives. Nothing hijacks the wheel - the lock is geometry, not JS.
+   Every section is exactly one screen and scroll is a trigger: one gesture
+   moves to the next or previous section, and that section's animation plays
+   on its own clock once it becomes active. Nothing scrubs, and there is no
+   scrolling "inside" a section.
    --------------------------------------------------------------------------- */
 
-function Pinned({
-  vh,
+function Panel({
   id,
-  pinClass,
+  active,
+  className,
   children,
 }: {
-  vh: number;
-  id?: string;
-  pinClass?: string;
-  children: (progress: MotionValue<number>) => ReactNode;
+  id: string;
+  active: boolean;
+  className?: string;
+  children: ReactNode;
 }) {
-  const ref = useRef<HTMLDivElement>(null);
-  const { scrollYProgress } = useScroll({
-    target: ref,
-    offset: ["start start", "end end"],
-  });
   return (
-    <div ref={ref} id={id} className="stage" style={{ height: `${vh}vh` }}>
-      <div className={`stage__pin ${pinClass ?? ""}`}>{children(scrollYProgress)}</div>
-    </div>
+    <section id={id} className={`panel ${className ?? ""} ${active ? "is-active" : ""}`}>
+      {children}
+    </section>
   );
 }
 
-/** Splits a string into words that rise out of a clipping mask on load. */
-function AnimatedWords({ text, delay = 0.5 }: { text: string; delay?: number }) {
-  const reduce = useReducedMotion();
-  return (
-    <span style={{ display: "inline" }}>
-      {text.split(" ").map((word, i) => (
-        <span
-          key={i}
-          style={{ display: "inline-block", overflow: "hidden", verticalAlign: "top" }}
-        >
-          <motion.span
-            style={{ display: "inline-block", paddingRight: "0.22em" }}
-            initial={reduce ? { y: 0 } : { y: "110%", filter: "blur(6px)" }}
-            animate={{ y: 0, filter: "blur(0px)" }}
-            transition={{ duration: 1, ease, delay: delay + i * 0.09 }}
-          >
-            {word}
-          </motion.span>
-        </span>
-      ))}
-    </span>
-  );
-}
+/* Entrances share one vocabulary: rise out of a mask, resolve a blur. */
+const rise: Variants = {
+  hidden: { opacity: 0, y: 30, filter: "blur(8px)" },
+  show: (i = 0) => ({
+    opacity: 1,
+    y: 0,
+    filter: "blur(0px)",
+    transition: { duration: 0.85, ease, delay: 0.1 + i * 0.09 },
+  }),
+};
 
 /* ------------------------------- sections -------------------------------- */
 
-function Hero({ progress }: { progress: MotionValue<number> }) {
+function Hero({ active }: { active: boolean }) {
   const reduce = useReducedMotion();
-  // Hold while the words land, then hand the frame off with a lift and blur.
-  const y = useTransform(progress, [0.55, 1], [0, -110]);
-  const opacity = useTransform(progress, [0.55, 0.92], [1, 0]);
-  const blur = useTransform(progress, [0.55, 0.95], ["blur(0px)", "blur(10px)"]);
-  const cueOpacity = useTransform(progress, [0, 0.25], [1, 0]);
-
+  const state = active || reduce ? "show" : "hidden";
   return (
-    <motion.header
-      className="hero"
-      style={reduce ? undefined : { y, opacity, filter: blur }}
-    >
-      <motion.p
-        className="hero__eyebrow"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 1, delay: 0.3 }}
-      >
+    <div className="hero">
+      <motion.p className="hero__eyebrow" variants={rise} initial="hidden" animate={state} custom={0}>
         {profile.role}
       </motion.p>
 
       <h1 className="hero__title">
-        <AnimatedWords text="Building things" delay={0.5} />
-        <br />
-        <em className="grad-ink">
-          <AnimatedWords text="that hold up." delay={0.72} />
-        </em>
+        <motion.span
+          style={{ display: "block" }}
+          variants={rise}
+          initial="hidden"
+          animate={state}
+          custom={1}
+        >
+          Building things
+        </motion.span>
+        <motion.em
+          className="grad-ink"
+          style={{ display: "block" }}
+          variants={rise}
+          initial="hidden"
+          animate={state}
+          custom={2}
+        >
+          that hold up.
+        </motion.em>
       </h1>
 
-      <motion.p
-        className="hero__sub"
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 1, ease, delay: 1.1 }}
-      >
+      <motion.p className="hero__sub" variants={rise} initial="hidden" animate={state} custom={3}>
         {profile.tagline}
       </motion.p>
 
-      <motion.div className="scrollcue" style={reduce ? undefined : { opacity: cueOpacity }}>
-        <motion.span
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 1, delay: 1.8 }}
-        >
-          Scroll
-        </motion.span>
+      <motion.div
+        className="scrollcue"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: active ? 1 : 0 }}
+        transition={{ duration: 0.8, delay: active ? 1.2 : 0 }}
+      >
+        <span>Scroll</span>
         <motion.span
           className="scrollcue__line"
           animate={{ scaleY: [1, 0.4, 1], opacity: [1, 0.4, 1] }}
@@ -128,22 +98,22 @@ function Hero({ progress }: { progress: MotionValue<number> }) {
           style={{ transformOrigin: "top" }}
         />
       </motion.div>
-    </motion.header>
+    </div>
   );
 }
 
-function KeyboardScene({ progress }: { progress: MotionValue<number> }) {
+function KeyboardScene({ active }: { active: boolean }) {
   const sceneRef = useRef<HTMLDivElement>(null);
   // The spotlight cone and every line of copy are gated by this class:
-  // nothing in the scene is visible until the lamp turns on, and it goes back
-  // off when the section rewinds so the next visit starts dark again.
+  // nothing is visible until the lamp comes on, and it goes back off when the
+  // section deactivates so the next visit starts dark again.
   const handleLight = (on: boolean) =>
-    sceneRef.current?.closest(".stage__pin")?.classList.toggle("is-lit", on);
+    sceneRef.current?.closest(".panel")?.classList.toggle("is-lit", on);
 
   return (
     <div className="section shell field-section" ref={sceneRef}>
       <p className="section__label">What I work in</p>
-      <KeyboardSection skills={skills} progress={progress} onLight={handleLight} />
+      <KeyboardSection skills={skills} active={active} onLight={handleLight} />
       <p className="field-note">
         Every key is something I&rsquo;ve shipped with.{" "}
         <span className="dim">Hover one.</span>
@@ -152,17 +122,10 @@ function KeyboardScene({ progress }: { progress: MotionValue<number> }) {
   );
 }
 
-function ArtifactScene({ progress }: { progress: MotionValue<number> }) {
+function ArtifactScene({ active }: { active: boolean }) {
   const reduce = useReducedMotion();
+  const state = active || reduce ? "show" : "hidden";
   const cardRef = useRef<HTMLAnchorElement>(null);
-
-  const labelOpacity = useTransform(progress, [0, 0.1], [0, 1]);
-  const labelY = useTransform(progress, [0, 0.1], [26, 0]);
-  // The card stands up out of the page like a product tile.
-  const cardOpacity = useTransform(progress, [0.03, 0.24], [0, 1]);
-  const cardY = useTransform(progress, [0.03, 0.38], [120, 0]);
-  const cardRotate = useTransform(progress, [0.03, 0.38], [14, 0]);
-  const asideOpacity = useTransform(progress, [0.6, 0.78], [0, 1]);
 
   const setSpot = (e: React.PointerEvent) => {
     const el = cardRef.current;
@@ -174,26 +137,11 @@ function ArtifactScene({ progress }: { progress: MotionValue<number> }) {
 
   return (
     <div className="section shell artifact">
-      <motion.p
-        className="section__label"
-        style={reduce ? undefined : { opacity: labelOpacity, y: labelY }}
-      >
+      <motion.p className="section__label" variants={rise} initial="hidden" animate={state} custom={0}>
         Currently proudest of
       </motion.p>
 
-      <motion.div
-        style={
-          reduce
-            ? undefined
-            : {
-                opacity: cardOpacity,
-                y: cardY,
-                rotateX: cardRotate,
-                transformPerspective: 1100,
-                transformOrigin: "center 85%",
-              }
-        }
-      >
+      <motion.div variants={rise} initial="hidden" animate={state} custom={1}>
         <a
           ref={cardRef}
           className="artifact__card spotlight"
@@ -214,10 +162,9 @@ function ArtifactScene({ progress }: { progress: MotionValue<number> }) {
             {flagship.stack.map((s, i) => (
               <motion.span
                 key={s}
-                initial={{ opacity: 0, y: 14 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.5, ease, delay: 0.35 + i * 0.07 }}
+                initial={{ opacity: 0, y: 12 }}
+                animate={active ? { opacity: 1, y: 0 } : { opacity: 0, y: 12 }}
+                transition={{ duration: 0.45, ease, delay: 0.45 + i * 0.07 }}
               >
                 {s}
               </motion.span>
@@ -229,10 +176,7 @@ function ArtifactScene({ progress }: { progress: MotionValue<number> }) {
         </a>
       </motion.div>
 
-      <motion.p
-        className="artifact__aside"
-        style={reduce ? undefined : { opacity: asideOpacity }}
-      >
+      <motion.p className="artifact__aside" variants={rise} initial="hidden" animate={state} custom={3}>
         There&rsquo;s more on{" "}
         <a href={profile.github} target="_blank" rel="noreferrer" data-cursor="hover">
           GitHub
@@ -244,18 +188,70 @@ function ArtifactScene({ progress }: { progress: MotionValue<number> }) {
   );
 }
 
+function Contact({ active }: { active: boolean }) {
+  const reduce = useReducedMotion();
+  const state = active || reduce ? "show" : "hidden";
+  return (
+    <div className="contact">
+      <h2 className="contact__title">
+        <SplitText text="Say hi." stagger={0.09} play={active || !!reduce} />
+      </h2>
+      <motion.div
+        className="contact__links"
+        variants={rise}
+        initial="hidden"
+        animate={state}
+        custom={2}
+      >
+        {(
+          [
+            [`mailto:${profile.email}`, "Email", false],
+            [profile.github, "GitHub", true],
+            [profile.linkedin, "LinkedIn", true],
+          ] as const
+        ).map(([href, label, ext]) => (
+          <Magnetic key={label} strength={0.4}>
+            <a
+              href={href}
+              {...(ext ? { target: "_blank", rel: "noreferrer" } : {})}
+              data-cursor="hover"
+            >
+              {label}
+            </a>
+          </Magnetic>
+        ))}
+      </motion.div>
+      <footer className="footer">
+        <span>&copy; 2026 {profile.name}</span>
+        <span>
+          WebGL &middot; no template &middot; keycap mesh from{" "}
+          <a
+            href="https://github.com/Naresh-Khatri/3d-portfolio"
+            target="_blank"
+            rel="noreferrer"
+            data-cursor="hover"
+          >
+            Naresh Khatri
+          </a>
+        </span>
+      </footer>
+    </div>
+  );
+}
+
 /* --------------------------------- app ----------------------------------- */
 
+const SECTIONS = ["top", "craft", "work", "contact"] as const;
+
 export default function App() {
-  const { scrollYProgress: pageProgress } = useScroll();
-  const rail = useSpring(pageProgress, { stiffness: 90, damping: 26, restDelta: 0.001 });
+  const reduce = useReducedMotion();
+  // Reduced motion keeps native scrolling; hijacking it would be hostile.
+  const { index, goTo } = useSectionNav(SECTIONS.length, !reduce);
 
   return (
     <>
       <div className="grain" />
       <Cursor />
-
-      <motion.div className="progress-rail" style={{ scaleX: rail }} />
 
       <div className="app">
         <motion.nav
@@ -264,7 +260,15 @@ export default function App() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 1, ease, delay: 0.2 }}
         >
-          <a className="nav__mark" href="#top" data-cursor="hover">
+          <a
+            className="nav__mark"
+            href="#top"
+            data-cursor="hover"
+            onClick={(e) => {
+              e.preventDefault();
+              goTo(0);
+            }}
+          >
             <span className="nav__dot" />
             {profile.name}
           </a>
@@ -282,61 +286,35 @@ export default function App() {
           </div>
         </motion.nav>
 
-        {/* Scene 1: the name. Holds until the words have said their piece. */}
-        <Pinned vh={170} id="top">
-          {(p) => <Hero progress={p} />}
-        </Pinned>
+        <Panel id="top" active={index === 0}>
+          <Hero active={index === 0} />
+        </Panel>
 
-        {/* Scene 2: the keyboard lifts into its product pose, then releases. */}
-        <Pinned vh={260} id="craft" pinClass="stage__pin--void">
-          {(p) => <KeyboardScene progress={p} />}
-        </Pinned>
+        <Panel id="craft" active={index === 1} className="panel--void">
+          <KeyboardScene active={index === 1} />
+        </Panel>
 
-        {/* Scene 3: CarScout stands up. */}
-        <Pinned vh={200} id="work">
-          {(p) => <ArtifactScene progress={p} />}
-        </Pinned>
+        <Panel id="work" active={index === 2}>
+          <ArtifactScene active={index === 2} />
+        </Panel>
 
-        {/* Scene 4: contact - no lock, the page just ends calmly. */}
-        <section className="contact" id="contact">
-          <h2 className="contact__title">
-            <SplitText text="Say hi." stagger={0.09} />
-          </h2>
-          <div className="contact__links">
-            {(
-              [
-                [`mailto:${profile.email}`, "Email", false],
-                [profile.github, "GitHub", true],
-                [profile.linkedin, "LinkedIn", true],
-              ] as const
-            ).map(([href, label, ext]) => (
-              <Magnetic key={label} strength={0.4}>
-                <a
-                  href={href}
-                  {...(ext ? { target: "_blank", rel: "noreferrer" } : {})}
-                  data-cursor="hover"
-                >
-                  {label}
-                </a>
-              </Magnetic>
-            ))}
-          </div>
-        </section>
+        <Panel id="contact" active={index === 3}>
+          <Contact active={index === 3} />
+        </Panel>
 
-        <footer className="footer">
-          <span>&copy; 2026 {profile.name}</span>
-          <span>
-            WebGL &middot; no template &middot; keycap mesh from{" "}
-            <a
-              href="https://github.com/Naresh-Khatri/3d-portfolio"
-              target="_blank"
-              rel="noreferrer"
+        {/* Where you are, and a way to jump. */}
+        <nav className="dots" aria-label="Sections">
+          {SECTIONS.map((s, i) => (
+            <button
+              key={s}
+              className={`dots__dot ${i === index ? "is-on" : ""}`}
+              aria-label={s}
+              aria-current={i === index}
               data-cursor="hover"
-            >
-              Naresh Khatri
-            </a>
-          </span>
-        </footer>
+              onClick={() => goTo(i)}
+            />
+          ))}
+        </nav>
       </div>
     </>
   );
