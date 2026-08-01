@@ -59,7 +59,11 @@ const ROW_TILT = [0, 0, 0, 0];
 const FINAL_Q = new THREE.Quaternion()
   .setFromAxisAngle(new THREE.Vector3(0, 0, 1), -(Math.PI / 2 - 0.32))
   .multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), 1.32));
-const FLAT_Q = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), 0.22);
+const FLAT_Q = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), 0.62);
+/** Where the board rests before it stands up: inside the spotlight, fully in
+ *  frame, tipped enough that you can read it as a keyboard. */
+const FLAT_POS = new THREE.Vector3(0, -1.15, 1.0);
+const POSE_POS = new THREE.Vector3(0, 0.55, 0);
 
 /* Everything the whole board shares per frame; Key legends read the lamp so
    the unlit logo materials cannot glow before the spotlight is on. */
@@ -469,27 +473,17 @@ function Board({
   const fillRef = useRef<THREE.DirectionalLight>(null);
   const rimRef = useRef<THREE.DirectionalLight>(null);
   const startAt = useRef<number | null>(progress ? null : -99); // null = waiting in the dark
-  const stand = useRef(progress ? 0 : 1); // 0 = flat, 1 = posed
-  const standVel = useRef(0);
   const litFired = useRef(!progress);
 
   /* Timeline (seconds from trigger, wall-clock so frame stalls cannot slow
      the choreography - a dropped frame skips ahead instead of dragging):
      0.00 - 0.45  spotlight ramps on with a flicker, board flat on the floor
      0.45 - 0.95  hold: half a second of the board just lying there
-     0.95 -       the stand-up, driven by a damped spring
+     0.95 - 2.45  the stand-up, smootherstep eased at both ends
 
-     The stand-up used ease-out cubic and read as a jolt. Ease-out's flaw for
-     physical motion is that velocity is at its MAXIMUM on frame one - the
-     board snapped into motion from a dead stop. A spring integrates from
-     rest instead: it accelerates in, carries momentum slightly past the pose,
-     and settles. Same reason UI toolkits moved from bezier curves to spring
-     physics for anything meant to feel like an object.
-
-     zeta = DAMP / (2 * sqrt(STIFF)) = 13 / (2*sqrt(105)) ~= 0.63, i.e.
-     underdamped: one small overshoot, no visible bounce. */
-  const FLAT_Y = -2.6;
-  useFrame((state, dt) => {
+     It used ease-out cubic, whose velocity is at its MAXIMUM on frame one -
+     the board snapped off the table from a dead stop. */
+  useFrame((state) => {
     const g = boardGroup.current;
     if (!g) return;
 
@@ -524,31 +518,16 @@ function Board({
     if (rimRef.current) rimRef.current.intensity = 0.7 * lamp;
 
     // -- board: flat and near the lens, then it recedes as it stands up --
-    const STIFF = 105;
-    const DAMP = 13;
-    const target = t > 0.95 ? 1 : 0;
+    // Smootherstep (Perlin): 6x^5 - 15x^4 + 10x^3. Velocity AND acceleration
+    // are both zero at each end, so the board eases out of rest and eases
+    // into the pose with nothing to snap at either edge. Driven off the wall
+    // clock, so it is frame-rate independent by construction.
+    const RISE = 1.6;
+    const x = THREE.MathUtils.clamp((t - 0.95) / RISE, 0, 1);
+    const u = x * x * x * (x * (x * 6 - 15) + 10);
 
-    // Fixed-timestep sub-stepping. Simply clamping dt would keep the spring
-    // stable but make it run in slow motion on a slow device, because the
-    // simulation would advance less than wall-clock time; the rest of the
-    // sequence is wall-clock, so the two would drift apart. Instead, consume
-    // the whole frame in 1/120s bites - stable at any frame rate, and the
-    // spring always finishes when it should.
-    const SUB = 1 / 120;
-    let remaining = Math.min(dt, 0.25); // never try to catch up a long stall
-    while (remaining > 0) {
-      const h = Math.min(SUB, remaining);
-      standVel.current += (target - stand.current) * STIFF * h;
-      standVel.current *= Math.exp(-DAMP * h);
-      stand.current += standVel.current * h;
-      remaining -= h;
-    }
-
-    // slerp extrapolates past 1, so the overshoot carries the pose too
-    const u = stand.current;
     g.quaternion.slerpQuaternions(FLAT_Q, FINAL_Q, u);
-    g.position.y = THREE.MathUtils.lerp(FLAT_Y, 0.55, u);
-    g.position.z = THREE.MathUtils.lerp(2.5, 0, u);
+    g.position.lerpVectors(FLAT_POS, POSE_POS, u);
   });
   const [active, setActive] = useState<string | null>(null);
 
