@@ -59,8 +59,15 @@ const ROW_TILT = [0, 0, 0, 0];
 const POSE_TIP = 1.42; // about X: face square-on to the camera, bottom edge nearest
 const POSE_ROLL = -0.75; // about Z: halfway between standing on a corner and flat
 const POSE_YAW = -0.16; // about Y: a hint of turn only - the face stays toward us
+/* Applied LAST, so it acts on the finished pose in world space rather than in
+   the board's own frame: a tilt about the horizontal screen axis. Negative
+   pushes the upper half away from the viewer and swings the lower half
+   toward them - the depth cue TIP/YAW could not give, because both of those
+   act before the roll and end up turning the face instead of leaning it. */
+const POSE_LEAN = -0.26;
 const FINAL_Q = new THREE.Quaternion()
-  .setFromAxisAngle(new THREE.Vector3(0, 1, 0), POSE_YAW)
+  .setFromAxisAngle(new THREE.Vector3(1, 0, 0), POSE_LEAN)
+  .multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), POSE_YAW))
   .multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), POSE_ROLL))
   .multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), POSE_TIP));
 const FLAT_Q = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), 0.62);
