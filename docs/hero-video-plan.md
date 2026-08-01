@@ -113,11 +113,14 @@ smooth painted composite, glossy white, rounded edges, the I-LOVE-NY /
 AMSTERDAM public-art genre.
 
 **The robot IS the I in BRIAN.** It stands in the lineup, upright, arms at its
-sides, in the letter's slot and at the letters' exact height — so the name
-reads as BRIAN and the robot reads as type. Nobody should notice it on the
-first pass. The whole hero turns on that: when it steps out later, the reveal
-is that one of the letters was alive, which is why the Pixar lamp works and
-"a robot walks out from behind a sign" does not.
+sides, in the letter's slot and at the letters' exact height.
+
+It is **not disguised and not a twist.** It plainly reads as a robot from the
+first frame — exactly like the Pixar lamp, which never pretends to be an I; it
+is obviously a lamp standing where the I goes. The pleasure is the composition,
+not a reveal. Do not prompt for a "hidden" or "disguised" figure: that produces
+something letter-shaped and lifeless, and the shot needs a machine that is
+clearly a machine and clearly part of the name.
 
 Two things this forces, and both are cheap now and expensive later:
 - the letters must be **robot height** — a humanoid at human scale sets the
@@ -136,9 +139,13 @@ also has to sell a machine as a glyph.
 > generated any other way has to be crossfaded and will drift.
 
 Ambient only: distant traffic crossing far background, light shifting, a flag
-or foliage moving. **The camera does not move. The letters do not move — and
-the robot is a letter.** It must not shift, breathe or glance; the reveal only
-works if it was perfectly still. 4-6 seconds.
+or foliage moving. **The camera does not move. The cast letters do not move.**
+
+The robot may idle — a slow weight shift, a small head turn — as long as it
+**returns to the keyframe pose exactly**, because that frame is also both
+joins. Since it was never hiding, letting it be visibly alive during the hold
+costs nothing and makes the street feel inhabited. Keep it small: it is
+standing in a sign, not performing. 4-6 seconds.
 
 **3. Intro (video).** `end_image = keyframe`, start from the same street empty.
 Two or three ordinary cars pass, then a white van crosses right-to-left as a
