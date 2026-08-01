@@ -469,15 +469,27 @@ function Board({
   const fillRef = useRef<THREE.DirectionalLight>(null);
   const rimRef = useRef<THREE.DirectionalLight>(null);
   const startAt = useRef<number | null>(progress ? null : -99); // null = waiting in the dark
+  const stand = useRef(progress ? 0 : 1); // 0 = flat, 1 = posed
+  const standVel = useRef(0);
   const litFired = useRef(!progress);
 
   /* Timeline (seconds from trigger, wall-clock so frame stalls cannot slow
      the choreography - a dropped frame skips ahead instead of dragging):
      0.00 - 0.45  spotlight ramps on with a flicker, board flat on the floor
      0.45 - 0.95  hold: half a second of the board just lying there
-     0.95 - 2.15  the tilt-up into POSE, eased hard at the tail            */
+     0.95 -       the stand-up, driven by a damped spring
+
+     The stand-up used ease-out cubic and read as a jolt. Ease-out's flaw for
+     physical motion is that velocity is at its MAXIMUM on frame one - the
+     board snapped into motion from a dead stop. A spring integrates from
+     rest instead: it accelerates in, carries momentum slightly past the pose,
+     and settles. Same reason UI toolkits moved from bezier curves to spring
+     physics for anything meant to feel like an object.
+
+     zeta = DAMP / (2 * sqrt(STIFF)) = 13 / (2*sqrt(105)) ~= 0.63, i.e.
+     underdamped: one small overshoot, no visible bounce. */
   const FLAT_Y = -2.6;
-  useFrame((state) => {
+  useFrame((state, dt) => {
     const g = boardGroup.current;
     if (!g) return;
 
@@ -512,8 +524,28 @@ function Board({
     if (rimRef.current) rimRef.current.intensity = 0.7 * lamp;
 
     // -- board: flat and near the lens, then it recedes as it stands up --
-    const u0 = THREE.MathUtils.clamp((t - 0.95) / 1.2, 0, 1);
-    const u = 1 - Math.pow(1 - u0, 3); // ease-out cubic: brisk start, soft landing
+    const STIFF = 105;
+    const DAMP = 13;
+    const target = t > 0.95 ? 1 : 0;
+
+    // Fixed-timestep sub-stepping. Simply clamping dt would keep the spring
+    // stable but make it run in slow motion on a slow device, because the
+    // simulation would advance less than wall-clock time; the rest of the
+    // sequence is wall-clock, so the two would drift apart. Instead, consume
+    // the whole frame in 1/120s bites - stable at any frame rate, and the
+    // spring always finishes when it should.
+    const SUB = 1 / 120;
+    let remaining = Math.min(dt, 0.25); // never try to catch up a long stall
+    while (remaining > 0) {
+      const h = Math.min(SUB, remaining);
+      standVel.current += (target - stand.current) * STIFF * h;
+      standVel.current *= Math.exp(-DAMP * h);
+      stand.current += standVel.current * h;
+      remaining -= h;
+    }
+
+    // slerp extrapolates past 1, so the overshoot carries the pose too
+    const u = stand.current;
     g.quaternion.slerpQuaternions(FLAT_Q, FINAL_Q, u);
     g.position.y = THREE.MathUtils.lerp(FLAT_Y, 0.55, u);
     g.position.z = THREE.MathUtils.lerp(2.5, 0, u);
