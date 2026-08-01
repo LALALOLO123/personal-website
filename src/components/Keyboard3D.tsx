@@ -103,7 +103,14 @@ const POSE_POS = new THREE.Vector3(0, 0.55, 0);
 /* `ready` is false until the board has finished standing up. A stray mouse
    position over where a key WILL be was popping company names on screen
    mid-move, before the board had even landed. */
-const STAGE = { lamp: 1, dark: false, ready: false };
+/* lamp STARTS at 0, and that matters. The canvas mounts before the section is
+   entered (an IntersectionObserver brings it in early) and R3F renders that
+   commit immediately - before any useFrame has run. At lamp 1 the legends,
+   which are unlit and multiplied by it, drew at full brightness for that one
+   frame: every logo flashing white against black caps just as the section
+   arrives. Measured at 612ms after the scroll: max channel 241 with zero
+   saturation, black either side of it. */
+const STAGE = { lamp: 0, dark: true, ready: false };
 
 /* Full black before the lamp strikes. Measured from when the section ARMS,
    which is the start of the 850ms scroll, not the end of it - so this has to
@@ -894,6 +901,8 @@ function Board({
     startAt.current = null;
     litFired.current = false;
     STAGE.ready = false; // the next visit starts mid-move again
+    STAGE.lamp = 0; // and starts dark, so re-entry cannot flash either
+    STAGE.dark = true;
     onLight?.(false);
     const g = boardGroup.current;
     if (g) {
