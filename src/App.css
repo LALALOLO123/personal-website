@@ -684,38 +684,9 @@
   }
 }
 
-/* Floating label pinned to the hovered key. drei renders this into a wrapper
-   div it owns, so the wrapper must not eat pointer events or the key would
-   lose hover the moment the label appeared over it. */
-.kb-label-wrap {
-  pointer-events: none !important;
-}
+/* The hovered key's name is no longer a DOM tooltip - it is an object in the
+   scene now (HoverCard in Keyboard3D). */
 
-.kb-label {
-  display: block;
-  white-space: nowrap;
-  font-family: var(--font-mono);
-  font-size: 0.78rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: #fff;
-  background: var(--ink);
-  padding: 0.34rem 0.62rem;
-  border-radius: 3px;
-  box-shadow: 0 8px 24px rgba(22, 21, 15, 0.28);
-  animation: kb-label-in 0.22s cubic-bezier(0.16, 1, 0.3, 1) both;
-}
-
-@keyframes kb-label-in {
-  from {
-    opacity: 0;
-    transform: translateY(6px) scale(0.94);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
 
 .kb__caption {
   position: absolute;
@@ -758,9 +729,8 @@
 
 @media (prefers-reduced-motion: reduce) {
   .kb__canvas,
-  .kb--skeleton::after,
-  .kb-label {
-    animation: none;
+  .kb--skeleton::after {
+    animation: none !important;
   }
 }
 
@@ -973,10 +943,7 @@
 .panel--void.is-lit .kb__caption {
   opacity: 1;
 }
-.panel--void .kb-label {
-  background: #f1efe9;
-  color: #16150f;
-}
+
 
 
 /* ---------------------------------------------------------------------------

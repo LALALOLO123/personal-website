@@ -116,6 +116,10 @@ const IMG = {
   SystemRDL: { hex: "01468B", img: "/logos/systemrdl.png" },
 };
 
+/* Marks that ARE the name - setting the name in type underneath them on the
+   hover card just prints the word twice. These show the logo alone. */
+const WORDMARK = ["SystemVerilog", "VHDL", "SystemRDL", "WebGL"];
+
 /* LinkedIn's mark is trademarked and simple-icons carries no path for it, so
    it is drawn in legendTexture instead - a tile with the letters knocked out,
    which is the actual logo rather than the bare word. Nothing else on the
@@ -138,6 +142,7 @@ for (const [label, v] of Object.entries(CUSTOM)) out[label] = v;
 for (const [label, v] of Object.entries(VECTOR)) out[label] = v;
 for (const [label, v] of Object.entries(IMG)) out[label] = v;
 for (const [label, hex] of Object.entries(TEXT)) out[label] = { text: TEXT_LEGEND[label], hex };
+for (const label of WORDMARK) if (out[label]) out[label].wordmark = true;
 
 /* These hexes used to be nudged so a near-black brand would still read as a
    MARK on a pale cap. The mark is white now and the cap wears the colour, so
@@ -153,6 +158,7 @@ const body = Object.entries(out)
     if (v.box) fields.push(`box: ${v.box}`);
     if (v.img) fields.push(`img: "${v.img}"`);
     if (v.text) fields.push(`text: "${v.text}"`);
+    if (v.wordmark) fields.push("wordmark: true");
     return `  ${JSON.stringify(label)}: { ${fields.join(", ")} },`;
   })
   .join("\n");
@@ -170,6 +176,8 @@ export type Legend = {
   /** White-ink mask served from /public, for logos that only exist as raster. */
   img?: string;
   text?: string;
+  /** The mark already spells the name; the hover card omits the caption. */
+  wordmark?: boolean;
 };
 
 export const LEGENDS: Record<string, Legend> = {

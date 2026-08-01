@@ -1,11 +1,11 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Canvas, useFrame, useThree, type ThreeEvent } from "@react-three/fiber";
-import { Html } from "@react-three/drei";
+import { Center, Text3D } from "@react-three/drei";
 import * as THREE from "three";
 import { RoundedBoxGeometry } from "three-stdlib";
 import { LEGENDS } from "../data/legends";
 import { useKeycapGeometry, capGeometry, HEIGHT_RATIO } from "../data/keycapGeometry";
-import { legendGeometry } from "../data/legendGeometry";
+import { legendGeometry, legendExtrude } from "../data/legendGeometry";
 import { playPress, playRelease, toggleSound } from "../data/keySound";
 
 /* ---------------------------------------------------------------------------
@@ -536,6 +536,154 @@ const Key = memo(function Key({ cap, geometry, texture, active, onEnter, onLeave
 });
 
 /* ---------------------------------------------------------------------------
+   Hover card
+
+   The name used to be a DOM tooltip pinned to the cursor, which meant it lived
+   on the website layer rather than in the room. This is the same information
+   as an object ON the set: the brand's own mark, extruded and standing on the
+   floor to the left of and below the board, with the name cut in bold behind
+   it. It carries its own light, because the studio spot is aimed at the board
+   and this sits well outside that cone.
+
+   Swaps are snappy on purpose - punch in, settle - so hovering across the
+   board feels like moving a selection through a menu.
+   --------------------------------------------------------------------------- */
+
+const CARD_LOGO_SIZE = 1.5;
+const CARD_TEXT_SIZE = 0.62;
+const CARD_WORDMARK_W = 3.1; // wordmarks are sized by width, not height
+
+/** Raster marks (the Accellera ones) have no vector to extrude, so the card
+ *  shows the mask on a plane instead. Cached, one texture per label. */
+type CardTex = { tex: THREE.Texture; aspect: number };
+const cardTexCache = new Map<string, CardTex>();
+
+/** Decoding is async, so the aspect is not known on the frame that asks for
+ *  it - the plane would be built square and the wordmark squashed. The aspect
+ *  is cached alongside the texture and `onLoad` nudges a re-render once it is
+ *  actually known. */
+function cardTexture(label: string, onLoad?: () => void): CardTex | null {
+  const img = LEGENDS[label]?.img;
+  if (!img) return null;
+  let entry = cardTexCache.get(label);
+  if (!entry) {
+    entry = { tex: new THREE.Texture(), aspect: 1 };
+    cardTexCache.set(label, entry);
+    new THREE.TextureLoader().load(img, (loaded) => {
+      entry!.tex.image = loaded.image;
+      entry!.tex.colorSpace = THREE.SRGBColorSpace;
+      entry!.tex.anisotropy = 8;
+      entry!.tex.needsUpdate = true;
+      entry!.aspect = loaded.image.width / loaded.image.height;
+      onLoad?.();
+    });
+  }
+  return entry;
+}
+
+function HoverCard({ label, offset }: { label: string | null; offset: { x: number; y: number } }) {
+  const group = useRef<THREE.Group>(null);
+  // Hold the last real label so the card can animate OUT with its own content
+  // still on it rather than blanking the instant the pointer leaves.
+  const [shown, setShown] = useState<string | null>(null);
+  const open = useRef(0);
+  const punch = useRef(0);
+
+  useEffect(() => {
+    if (label) {
+      setShown(label);
+      punch.current = 1; // restart the settle on every swap
+    }
+  }, [label]);
+
+  const [, bump] = useState(0);
+  const solid = shown ? legendExtrude(shown) : null;
+  const card = shown && !solid ? cardTexture(shown, () => bump((n) => n + 1)) : null;
+  const brand = useMemo(
+    () => new THREE.Color(shown ? LEGENDS[shown]?.hex ?? "#ffffff" : "#ffffff"),
+    [shown]
+  );
+  const isWordmark = !!(shown && LEGENDS[shown]?.wordmark);
+  // Wordmarks are wide and short, so they are sized by WIDTH; a logo mark is
+  // roughly square and is sized by height. Sizing both the same way either
+  // shrinks the wordmark to a strip or runs it off the side of the frame.
+  const cardW = card
+    ? Math.min(CARD_LOGO_SIZE * card.aspect, CARD_WORDMARK_W)
+    : CARD_LOGO_SIZE;
+
+  useFrame((_, dt) => {
+    const g = group.current;
+    if (!g) return;
+    const k = 1 - Math.exp(-dt * 11);
+    open.current += ((label ? 1 : 0) - open.current) * k;
+    punch.current += (0 - punch.current) * (1 - Math.exp(-dt * 7));
+
+    const o = open.current;
+    const p = punch.current;
+    g.visible = o > 0.002;
+    // overshoot on entry, then settle - the menu-select feel
+    g.scale.setScalar(o * (1 + p * 0.14));
+    g.position.set(offset.x, offset.y - (1 - o) * 0.7, 1.6);
+    g.rotation.y = -0.34 + p * 0.5;
+    g.rotation.x = p * -0.12;
+  });
+
+  if (!shown) return null;
+
+  return (
+    <group ref={group} visible={false}>
+      {/* its own key light: the studio spot never reaches out here */}
+      <pointLight position={[1.6, 1.8, 3]} intensity={26} distance={14} color="#eaf0ff" />
+      <pointLight position={[-2.4, -0.6, 2]} intensity={10} distance={10} color={brand} />
+
+      {solid && (
+        <mesh
+          geometry={solid}
+          scale={isWordmark ? CARD_WORDMARK_W : CARD_LOGO_SIZE}
+          position={[0, isWordmark ? 0.2 : 1.05, 0]}
+        >
+          <meshStandardMaterial
+            color={brand}
+            emissive={brand}
+            emissiveIntensity={0.34}
+            roughness={0.3}
+            metalness={0.15}
+          />
+        </mesh>
+      )}
+
+      {/* no vector for this one: the official mark, flat but still in-world */}
+      {card && (
+        <mesh position={[0, isWordmark ? 0.2 : 1.05, 0]}>
+          <planeGeometry args={[cardW, cardW / card.aspect]} />
+          <meshBasicMaterial map={card.tex} transparent depthWrite={false} toneMapped={false} />
+        </mesh>
+      )}
+
+      {/* A wordmark already says the name; setting it again underneath just
+          prints the word twice. */}
+      {!isWordmark && (
+        <Center position={[0, -0.35, 0]}>
+          <Text3D
+            font="/fonts/helvetiker_bold.typeface.json"
+            size={CARD_TEXT_SIZE}
+            height={0.16}
+            bevelEnabled
+            bevelThickness={0.012}
+            bevelSize={0.009}
+            bevelSegments={2}
+            curveSegments={5}
+          >
+            {shown}
+            <meshStandardMaterial color="#f4f2ee" emissive="#8d94a6" emissiveIntensity={0.2} roughness={0.34} metalness={0.2} />
+          </Text3D>
+        </Center>
+      )}
+    </group>
+  );
+}
+
+/* ---------------------------------------------------------------------------
    Camera
 
    The board is a fixed-size object, so the camera is solved for it rather than
@@ -794,10 +942,19 @@ function Board({
   }, []);
 
   const activeCap = active ? placed.find((p) => p.label === active) : null;
+  /* Sits off the board's lower-left corner, derived from the board size so it
+     stays put if the layout changes. The board is posed on its corner, so
+     that part of frame is empty. */
+  const cardAt = useMemo(
+    () => ({ x: -width * 0.38, y: -depth * 0.62 - 0.6 }),
+    [width, depth]
+  );
 
   return (
     <>
       <FitCamera width={width} depth={depth} />
+
+      <HoverCard label={activeCap && !activeCap.blank ? activeCap.label : null} offset={cardAt} />
 
       {/* the studio rig: everything starts dark and the sequence ramps it */}
       <ambientLight ref={ambRef} intensity={0} color="#dfe3ea" />
@@ -851,17 +1008,6 @@ function Board({
             waveAt={(cap.x - originX) * 0.06}
           />
         ))}
-
-        {activeCap && !activeCap.blank && (
-          <Html
-            position={[activeCap.x, ROW_LIFT + 0.66, activeCap.z]}
-            center
-            zIndexRange={[20, 0]}
-            wrapperClass="kb-label-wrap"
-          >
-            <span className="kb-label">{activeCap.label}</span>
-          </Html>
-        )}
 
       </group>
     </>

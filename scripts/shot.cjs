@@ -22,6 +22,11 @@ if (!out) {
 (async () => {
   const browser = await puppeteer.launch();
   const page = await browser.newPage();
+
+  // Registered BEFORE anything navigates, or it catches nothing.
+  const errs = [];
+  page.on("pageerror", (e) => errs.push(e.message));
+  page.on("console", (m) => m.type() === "error" && errs.push(m.text()));
   await page.setViewportSize?.({ width: 1600, height: 1000 });
   await page.setViewport({ width: 1600, height: 1000 });
   await page.goto(URL, { waitUntil: "networkidle2" });
@@ -29,6 +34,13 @@ if (!out) {
   // section 2 is the board; its reveal runs on its own clock once armed
   await page.keyboard.press("ArrowDown");
   await new Promise((r) => setTimeout(r, 4200));
+
+  // HOVER="x,y" parks the real cursor over a key so the hover card is up
+  if (process.env.HOVER) {
+    const [hx, hy] = process.env.HOVER.split(",").map(Number);
+    await page.mouse.move(hx, hy);
+    await new Promise((r) => setTimeout(r, 900));
+  }
 
   const full = await page.screenshot({ type: "png" });
 
@@ -53,12 +65,11 @@ if (!out) {
     cw
       ? [+cx, +cy, +cw, +ch, 2]
       : // the board's bounding area in the 1600x1000 frame, at ~62%
-        [330, 60, 990, 850, 0.62]
+        [120, 40, 1300, 930, 0.52]
   );
 
   require("fs").writeFileSync(out, Buffer.from(url.split(",")[1], "base64"));
-  const errs = [];
-  page.on("pageerror", (e) => errs.push(e.message));
-  console.log(`wrote ${out}` + (errs.length ? `  (${errs.length} page errors)` : ""));
+  console.log(`wrote ${out}`);
+  if (errs.length) console.log("PAGE ERRORS:\n  " + errs.join("\n  "));
   await browser.close();
 })();
