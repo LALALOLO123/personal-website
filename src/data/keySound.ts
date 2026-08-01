@@ -36,7 +36,12 @@ class Sample {
 
 let press: Sample | null = null;
 let release: Sample | null = null;
-let enabled = false;
+
+/* On by default. Browsers still will not make a sound until the visitor has
+   interacted with the page, so `unlock` below primes everything on the first
+   gesture - any gesture, not a dedicated "enable audio" click. Until then
+   play() rejects harmlessly. */
+let enabled = true;
 
 function ensure() {
   if (!press) press = new Sample("/sounds/press.mp3", 0.35);
@@ -47,14 +52,30 @@ export function soundEnabled() {
   return enabled;
 }
 
-export function toggleSound(): boolean {
-  enabled = !enabled;
-  if (enabled) {
-    ensure();
-    // The toggle itself is a click, so this doubles as the unlock gesture.
-    press?.play();
-  }
+export function setSound(on: boolean): boolean {
+  enabled = on;
+  if (enabled) ensure();
   return enabled;
+}
+
+export function toggleSound(): boolean {
+  return setSound(!enabled);
+}
+
+/* Prime audio on the visitor's first interaction, whatever it is - a scroll,
+   a key, a click. Autoplay policy blocks sound before that, and with sound on
+   by default there is no "turn it on" click to hang this off. Runs once. */
+if (typeof window !== "undefined") {
+  const unlock = () => {
+    ensure();
+    audio(); // creating and resuming the AudioContext must happen in a gesture
+    for (const ev of ["pointerdown", "keydown", "wheel", "touchstart"]) {
+      window.removeEventListener(ev, unlock);
+    }
+  };
+  for (const ev of ["pointerdown", "keydown", "wheel", "touchstart"]) {
+    window.addEventListener(ev, unlock, { passive: true });
+  }
 }
 
 /* ---------------------------------------------------------------------------

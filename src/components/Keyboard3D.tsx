@@ -6,7 +6,7 @@ import { RoundedBoxGeometry } from "three-stdlib";
 import { LEGENDS } from "../data/legends";
 import { useKeycapGeometry, capGeometry, HEIGHT_RATIO } from "../data/keycapGeometry";
 import { legendGeometry, legendExtrude, brandLogo } from "../data/legendGeometry";
-import { playPress, playRelease, toggleSound, playStageLight } from "../data/keySound";
+import { playPress, playRelease, playStageLight } from "../data/keySound";
 
 /* ---------------------------------------------------------------------------
    Layout
@@ -99,7 +99,10 @@ const POSE_POS = new THREE.Vector3(0, 0.55, 0);
 
 /* Everything the whole board shares per frame; Key legends read the lamp so
    the unlit logo materials cannot glow before the spotlight is on. */
-const STAGE = { lamp: 1, dark: false };
+/* `ready` is false until the board has finished standing up. A stray mouse
+   position over where a key WILL be was popping company names on screen
+   mid-move, before the board had even landed. */
+const STAGE = { lamp: 1, dark: false, ready: false };
 
 /* Full black before the lamp strikes. Measured from when the section ARMS,
    which is the start of the 850ms scroll, not the end of it - so this has to
@@ -564,6 +567,8 @@ const CARD_WORDMARK_W = 3.7; // wordmarks are sized by width, not height
 const CARD_TEXT_DEPTH = 0.54;
 /** The floor plane. The letters STAND on it rather than hovering over it. */
 const CARD_FLOOR_Y = -5.4;
+/** Below this a fill cannot be read against the studio floor. */
+const CARD_MIN_LUM = 0.07;
 /** Turned to face right. Negative would swing the face to the left, which is
  *  away from the board it belongs to. */
 const CARD_YAW = 0.3;
@@ -683,26 +688,19 @@ function HoverCard({ label, offset }: { label: string | null; offset: { x: numbe
     () => new THREE.Color(cardInk(shown ? LEGENDS[shown]?.hex ?? "#ffffff" : "#ffffff")),
     [shown]
   );
-  /* cardInk lifts a black brand hex, but that only covers the monochrome
-     path - a full-colour logo carries black in its own fills, so Vercel,
-     Next.js, Three.js and GitHub came back as invisible silhouettes against
-     the floor. Judged on the mark AS A WHOLE: if nothing in it has any real
-     brightness the entire thing is lifted, keeping the relative values so a
-     two-tone mark stays two-tone. Anything with actual colour in it is left
-     exactly as the brand publishes it, so Docker's dark hull and Java's
-     outline are untouched. */
+  /* Judged PER FILL, not per mark. Most lockups set the company name in a
+     near-black or very dark ink - Docker's "docker" is a deep navy - which is
+     unreadable on this floor even though the mark beside it is bright. Any
+     fill too dark to read goes white; everything above the line keeps the
+     brand's own colour, so Docker's blue whale and Java's outline survive
+     while their names turn white. Threshold is low enough that only genuinely
+     unreadable fills are touched. */
   const logoColors = useMemo(() => {
     if (!logo) return null;
-    const cols = logo.map((p) => new THREE.Color(p.color));
-    const peak = Math.max(
-      ...cols.map((c) => 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b)
-    );
-    if (peak > 0.05) return cols;
-    const hsl = { h: 0, s: 0, l: 0 };
-    return cols.map((c) => {
-      c.getHSL(hsl, THREE.SRGBColorSpace);
-      c.setHSL(hsl.h, hsl.s, Math.min(0.97, 0.74 + hsl.l * 1.8), THREE.SRGBColorSpace);
-      return c;
+    return logo.map((p) => {
+      const c = new THREE.Color(p.color);
+      const lum = 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b;
+      return lum < CARD_MIN_LUM ? new THREE.Color("#f4f6fa") : c;
     });
   }, [logo]);
 
@@ -766,7 +764,7 @@ function HoverCard({ label, offset }: { label: string | null; offset: { x: numbe
 
     const p = punch.current;
     // matcap is unlit, so it would happily shine through the blackout
-    g.visible = open.current > 0.02 && !STAGE.dark;
+    g.visible = open.current > 0.02 && !STAGE.dark && STAGE.ready;
     g.scale.setScalar(1 + p * 0.12);
     g.position.set(offset.x, CARD_FLOOR_Y, offset.z);
     g.rotation.y = CARD_YAW + p * 0.42;
@@ -937,6 +935,7 @@ function Board({
     if (armed || !live) return;
     startAt.current = null;
     litFired.current = false;
+    STAGE.ready = false; // the next visit starts mid-move again
     onLight?.(false);
     const g = boardGroup.current;
     if (g) {
@@ -1012,6 +1011,7 @@ function Board({
     const x = THREE.MathUtils.clamp((s - 0.5) / RISE, 0, 1);
     const u = x * x * x * (x * (x * 6 - 15) + 10);
 
+    STAGE.ready = x >= 1;
     g.quaternion.slerpQuaternions(FLAT_Q, FINAL_Q, u);
     g.position.lerpVectors(FLAT_POS, POSE_POS, u);
 
@@ -1189,7 +1189,6 @@ export default function Keyboard3D({
   onLight?: (on: boolean) => void;
 }) {
   const [label, setLabel] = useState<string | null>(null);
-  const [sound, setSound] = useState(false);
 
   return (
     <div className="kb">
@@ -1219,17 +1218,6 @@ export default function Keyboard3D({
         {label ?? "Hover a key."}
       </p>
 
-      {/* A speaker keycap sat oddly among thirty logos, so the toggle lives
-          out here. Clicking it is also the gesture that unlocks audio. */}
-      <button
-        type="button"
-        className="kb__sound"
-        data-cursor="hover"
-        aria-pressed={sound}
-        onClick={() => setSound(toggleSound())}
-      >
-        sound {sound ? "on" : "off"}
-      </button>
     </div>
   );
 }

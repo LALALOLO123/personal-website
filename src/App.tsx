@@ -1,10 +1,11 @@
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { motion, useReducedMotion, type Variants } from "motion/react";
 import "./App.css";
 import Cursor from "./components/Cursor";
 import KeyboardSection from "./components/KeyboardSection";
 import { SplitText, ShinyText, Magnetic } from "./components/Bits";
 import { useSectionNav } from "./hooks/useSectionNav";
+import { soundEnabled, toggleSound } from "./data/keySound";
 import { profile, skills, flagship } from "./data/content";
 
 const ease = [0.16, 1, 0.3, 1] as const;
@@ -267,6 +268,7 @@ export default function App() {
   const reduce = useReducedMotion();
   // Reduced motion keeps native scrolling; hijacking it would be hostile.
   const { index, goTo } = useSectionNav(SECTIONS.length, !reduce);
+  const [sound, setSound] = useState(soundEnabled());
 
   return (
     <>
@@ -293,6 +295,19 @@ export default function App() {
             {profile.name}
           </a>
           <div className="nav__links">
+            {/* Site-wide, because the keycap clicks and the stage lamp both
+                use it. On by default; browsers stay silent until the first
+                interaction regardless, which keySound primes for. */}
+            <button
+              type="button"
+              className="nav__sound"
+              data-cursor="hover"
+              aria-pressed={sound}
+              aria-label={sound ? "Turn sound off" : "Turn sound on"}
+              onClick={() => setSound(toggleSound())}
+            >
+              Sound {sound ? "on" : "off"}
+            </button>
             <Magnetic>
               <a href={profile.github} target="_blank" rel="noreferrer" data-cursor="hover">
                 GitHub
