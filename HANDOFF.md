@@ -2,30 +2,36 @@
 
 Read this first, then `docs/`. Written 2026-08-01.
 
+**Working copy:** `C:\Users\brian\OneDrive\Desktop\Resume\personal-website`
 **Repo:** https://github.com/jiacheng-fu/personal-website (branch `main`)
 **Live:** https://brianfu.vercel.app — ⚠️ serving a build from *well before*
 everything below. Nothing in this document is deployed yet.
+
+The working directory for a new chat is the **parent** folder,
+`C:\Users\brian\OneDrive\Desktop\Resume` — that is where `.mcp.json` and
+`.claude/` live, so MCP servers only resolve when a session is opened there.
+See `../README.md` for what else is in that folder.
+
+```bash
+cd "C:/Users/brian/OneDrive/Desktop/Resume/personal-website"
+npm install          # only if node_modules is missing
+npm run dev          # http://localhost:5173
+npm run build        # tsc --noEmit, then vite build
+```
+
+`npm run build` passes clean as of this writing. If it suddenly reports dozens
+of R3F errors like `Property 'color' does not exist on type ExtendedColors<...>`,
+the code is fine — something has broken TypeScript's automatic `@types`
+discovery. **Do not "fix" the components.** This was hit once by symlinking
+`node_modules` out of OneDrive via a junction; TypeScript resolves the real
+path and then stops finding the type augmentations. A real `node_modules`
+directory is required.
 
 ---
 
 ## 0 · Do these before anything else
 
-1. **Get the code out of `%TEMP%`.** The only working copy is currently at
-   `C:\Users\brian\AppData\Local\Temp\claude\...\scratchpad\personal-website`,
-   which Windows deletes. Everything is pushed, so nothing is lost — but
-   re-clone somewhere permanent and work there:
-
-   ```bash
-   git clone https://github.com/jiacheng-fu/personal-website C:\dev\personal-website
-   cd C:\dev\personal-website
-   npm install
-   npm run dev            # http://localhost:5173
-   ```
-
-   Not inside OneDrive — it tries to sync `node_modules`, which is slow and
-   occasionally corrupts installs.
-
-2. **Install a transcoder before generating any video.**
+1. **Install a transcoder before generating any video.**
    ```bash
    npm i -D ffmpeg-static
    ```
@@ -33,8 +39,9 @@ everything below. Nothing in this document is deployed yet.
    and bitrate of any generated clip are **irreversible** — the only fix is
    paying to generate again. See `docs/hero-generation-spec.md` §4.4.
 
-3. **Kill stale dev servers.** Ports 5174 and 5199 have old servers on old
-   code; landing on one will waste your time. `npx kill-port 5174 5199`.
+2. **Check for stale dev servers before trusting what you see.** Several have
+   accumulated on 5174 and 5199 during this project, serving old code from
+   old paths; landing on one wastes an hour. `npx kill-port 5173 5174 5199`.
 
 ---
 
@@ -85,11 +92,13 @@ Do not rebuild the diorama.
 **Node + npm.** `npm install`, `npm run dev` (5173), `npm run build` (runs
 `tsc --noEmit` first — typecheck failures block the build).
 
-**MCPs are scoped per project directory**, so a new chat in a new folder starts
-with none. Re-add what you need:
+**MCPs are scoped per directory.** `../.mcp.json` already declares Playwright,
+so it loads automatically — but **only for a session opened at
+`C:\Users\brian\OneDrive\Desktop\Resume`**, not one opened inside this repo.
+Open the parent folder. To add another:
 
 ```bash
-claude mcp add playwright npx @playwright/mcp@latest
+claude mcp add <name> npx <package>
 ```
 
 **Higgsfield MCP** — Brian's account, **Plus plan, 1,210 credits** at time of
@@ -97,10 +106,16 @@ writing. Connect via Higgsfield's official MCP connector (account already
 exists; don't create a second one). Verify with the `balance` tool before
 spending.
 
-**Puppeteer** is used by the repo's dev scripts but is **not** a dependency of
-this project — it resolves from `C:\Users\brian\OneDrive\Desktop\Resume\node_modules`.
-If you move the repo, either install it (`npm i -D puppeteer`) or fix the paths
-at the top of each script.
+> **Playwright MCP pins the browser viewport**, which does not match the window
+> it opens. That once produced a confident, wrong report that fullscreen layout
+> was broken — the site was fine. When judging layout, compare
+> `window.innerWidth` against `outerWidth` before believing a screenshot.
+
+**Puppeteer** drives the dev scripts below but is **not** a dependency of this
+repo — it resolves from `..\node_modules`, in the parent folder. The scripts
+hardcode that absolute path, so they work as long as this repo stays a child of
+`Desktop\Resume`. Move it elsewhere and either `npm i -D puppeteer` here or fix
+the `require` at the top of each script.
 
 ### Dev scripts (all dev-only, run by hand)
 
