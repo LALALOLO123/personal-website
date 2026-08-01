@@ -64,11 +64,14 @@ function buildLogo(svgText: string): LogoPart[] | null {
     );
     if (!shapes.length) continue;
 
+    /* Depth 26 of a 128-unit box worked out at roughly the same as the cap
+       height of the name beside it - a 1:1 depth-to-height slab, which is why
+       the lockups read as chunky rather than dimensional. Halved. */
     const geo = new THREE.ExtrudeGeometry(shapes, {
-      depth: 26,
+      depth: 13,
       bevelEnabled: true,
-      bevelThickness: 2,
-      bevelSize: 1.6,
+      bevelThickness: 1.4,
+      bevelSize: 1.1,
       bevelSegments: 2,
       curveSegments: 8,
     });

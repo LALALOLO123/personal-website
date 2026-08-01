@@ -564,7 +564,7 @@ const CARD_LOGO_SIZE = 1.7;
 const CARD_TEXT_SIZE = 0.82;
 const CARD_WORDMARK_W = 3.7; // wordmarks are sized by width, not height
 /** Deep slab, like the freestanding letters in the hero plan - not signage. */
-const CARD_TEXT_DEPTH = 0.54;
+const CARD_TEXT_DEPTH = 0.3;
 /** The floor plane. The letters STAND on it rather than hovering over it. */
 const CARD_FLOOR_Y = -5.4;
 /** Below this a fill cannot be read against the studio floor. */
