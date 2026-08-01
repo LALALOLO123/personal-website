@@ -51,9 +51,21 @@ export const skills = [
  * Dates are when the work happened, not when the repo was pushed to GitHub:
  * Project Horizon has been going since 2023 but the repo was created in 2026.
  */
+/* What the projector throws on the screen.
+ *
+ * `clip` is an mp4 and wins when present; `still` is a fallback frame. A
+ * project with neither gets a film leader on screen instead - honest about
+ * there being no footage yet, and on-theme, rather than a broken black
+ * rectangle. Drop an mp4 in public/reels and set `clip` to light it up.
+ *
+ * Only real material: CarScout is a capture of the live site, Wild West is
+ * the game's own background art from its repo. Horizon and CarStatus need
+ * footage recorded - neither can be captured from here (one is a Unity
+ * build, the other a CLI against a live car). */
 export const projects = [
   {
     title: "Project Horizon",
+    reel: {},
     years: "2023 — now",
     repo: "https://github.com/jiacheng-fu/project-horizon",
     blurb:
@@ -62,6 +74,7 @@ export const projects = [
   },
   {
     title: "Wild West Party Game",
+    reel: { still: "/shots/wild-west.jpg" },
     years: "2024",
     repo: "https://github.com/jiacheng-fu/wild-west-party-game",
     blurb:
@@ -70,6 +83,7 @@ export const projects = [
   },
   {
     title: "CarStatus",
+    reel: {},
     years: "2026",
     repo: "https://github.com/jiacheng-fu/CarStatus",
     blurb:
@@ -80,6 +94,7 @@ export const projects = [
 
 /** One artifact, chosen because you can click it and it responds. */
 export const flagship = {
+  reel: { still: "/shots/carscout.jpg" },
   title: "CarScout",
   live: "https://d1j3m9qdbgs5ik.cloudfront.net",
   repo: "https://github.com/jiacheng-fu/CarScout",

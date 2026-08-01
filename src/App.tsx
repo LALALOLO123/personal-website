@@ -4,12 +4,11 @@ import "./App.css";
 import Cursor from "./components/Cursor";
 // Smoke tests only. Lazy, so three.js never reaches the main chunk.
 const WorkScene = lazy(() => import("./components/WorkScene"));
-import type { WorkVariant } from "./components/WorkScene";
 import KeyboardSection from "./components/KeyboardSection";
-import { SplitText, ShinyText, Magnetic } from "./components/Bits";
+import { SplitText, Magnetic } from "./components/Bits";
 import { useSectionNav } from "./hooks/useSectionNav";
 import { soundEnabled, toggleSound } from "./data/keySound";
-import { profile, skills, flagship, projects } from "./data/content";
+import { profile, skills } from "./data/content";
 
 const ease = [0.16, 1, 0.3, 1] as const;
 
@@ -146,19 +145,10 @@ function KeyboardScene({ active }: { active: boolean }) {
   );
 }
 
-function ArtifactScene({ active }: { active: boolean }) {
+function WorkSection({ active }: { active: boolean }) {
   const reduce = useReducedMotion();
   const state = active || reduce ? "show" : "hidden";
-  const cardRef = useRef<HTMLAnchorElement>(null);
-  const variant = new URLSearchParams(location.search).get("work") as WorkVariant | null;
-
-  const setSpot = (e: React.PointerEvent) => {
-    const el = cardRef.current;
-    if (!el) return;
-    const r = el.getBoundingClientRect();
-    el.style.setProperty("--mx", `${((e.clientX - r.left) / r.width) * 100}%`);
-    el.style.setProperty("--my", `${((e.clientY - r.top) / r.height) * 100}%`);
-  };
+  const [shown, setShown] = useState<any>(null);
 
   return (
     <div className="section shell artifact">
@@ -166,76 +156,16 @@ function ArtifactScene({ active }: { active: boolean }) {
         Selected work
       </motion.p>
 
-      {variant ? (
-        <Suspense fallback={null}>
-          <WorkScene variant={variant} />
-        </Suspense>
-      ) : (
-      <div className="work">
+      <Suspense fallback={null}>
+        <WorkScene onSelect={setShown} />
+      </Suspense>
 
-      <motion.div className="work__lead" variants={rise} initial="hidden" animate={state} custom={1}>
-        <a
-          ref={cardRef}
-          className="artifact__card spotlight"
-          href={flagship.live}
-          target="_blank"
-          rel="noreferrer"
-          data-cursor="hover"
-          onPointerMove={setSpot}
-        >
-          <div className="artifact__head">
-            <h2 className="artifact__title">{flagship.title}</h2>
-            <span className="artifact__live">
-              <ShinyText>Live</ShinyText>
-            </span>
-          </div>
-          <p className="artifact__blurb">{flagship.blurb}</p>
-          <div className="artifact__stack">
-            {flagship.stack.map((s, i) => (
-              <motion.span
-                key={s}
-                initial={{ opacity: 0, y: 12 }}
-                animate={active ? { opacity: 1, y: 0 } : { opacity: 0, y: 12 }}
-                transition={{ duration: 0.45, ease, delay: 0.45 + i * 0.07 }}
-              >
-                {s}
-              </motion.span>
-            ))}
-          </div>
-          <span className="artifact__cta">
-            <ShinyText>Open it &rarr;</ShinyText>
-          </span>
-        </a>
-      </motion.div>
-
-        {/* The rest, as a list. The featured card carries the detail; these
-            carry the range - a game, a hackathon build, a hardware CLI. */}
-        <ol className="work__list">
-          {projects.map((p, i) => (
-            <motion.li
-              key={p.title}
-              className="proj"
-              initial={{ opacity: 0, y: 16 }}
-              animate={active ? { opacity: 1, y: 0 } : { opacity: 0, y: 16 }}
-              transition={{ duration: 0.55, ease, delay: 0.3 + i * 0.09 }}
-            >
-              <a href={p.repo} target="_blank" rel="noreferrer" data-cursor="hover">
-                <span className="proj__year">{p.years}</span>
-                <span className="proj__body">
-                  <span className="proj__title">{p.title}</span>
-                  <span className="proj__blurb">{p.blurb}</span>
-                  <span className="proj__stack">
-                    {p.stack.map((s) => (
-                      <span key={s}>{s}</span>
-                    ))}
-                  </span>
-                </span>
-              </a>
-            </motion.li>
-          ))}
-        </ol>
+      {/* the reel notes, out of the way of the beam */}
+      <div className="reelnote">
+        <p className="reelnote__meta">{shown?.years}</p>
+        <p className="reelnote__blurb">{shown?.blurb}</p>
+        <p className="reelnote__stack">{shown?.stack?.join("  ·  ")}</p>
       </div>
-      )}
 
       <motion.p className="artifact__aside" variants={rise} initial="hidden" animate={state} custom={3}>
         All of it is on{" "}
@@ -307,7 +237,6 @@ export default function App() {
   const reduce = useReducedMotion();
   // Reduced motion keeps native scrolling; hijacking it would be hostile.
   const { index, goTo } = useSectionNav(SECTIONS.length, !reduce);
-  const workVariant = new URLSearchParams(location.search).get("work");
   const [sound, setSound] = useState(soundEnabled());
 
   return (
@@ -369,8 +298,8 @@ export default function App() {
           <KeyboardScene active={index === 1} />
         </Panel>
 
-        <Panel id="work" active={index === 2} className={workVariant ? "panel--work" : ""}>
-          <ArtifactScene active={index === 2} />
+        <Panel id="work" active={index === 2} className="panel--work">
+          <WorkSection active={index === 2} />
         </Panel>
 
         <Panel id="contact" active={index === 3}>

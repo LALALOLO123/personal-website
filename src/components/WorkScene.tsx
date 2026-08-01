@@ -1,36 +1,41 @@
-import { Suspense, useMemo, useRef, useState } from "react";
-import { Canvas, useFrame, useLoader } from "@react-three/fiber";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { Canvas, useFrame } from "@react-three/fiber";
 import { Text3D } from "@react-three/drei";
 import * as THREE from "three";
 import { RoundedBoxGeometry } from "three-stdlib";
-import { brandLogo, type LogoPart } from "../data/legendGeometry";
+import { brandLogo } from "../data/legendGeometry";
 import { projects, flagship } from "../data/content";
 import { LEGENDS } from "../data/legends";
+import { playStageLight } from "../data/keySound";
 
 /* ---------------------------------------------------------------------------
-   Work — three competing ideas, rough.
+   Work — the projector
 
-   Smoke tests, not finished work: enough of each to judge the FEEL. Pick one
-   with ?work=gallery | explode | projector and the rest gets deleted.
+   Every project is a cartridge sitting in a rack. Click one and it is carried
+   into the projector, the lamp catches, and its reel plays on the screen.
 
-   All three share the keyboard's studio - black floor, hard key light - both
-   because it is cheaper and because it is the argument: the site should read
-   as one place rather than a series of unrelated tricks.
+   Same studio as the keyboard: black floor, hard key light, a machine you
+   operate. The point is that the work is something you LOAD, not a grid you
+   scroll past.
+
+   Where there is no footage yet the screen shows a film leader rather than a
+   black rectangle - honest about the gap and on-theme.
    --------------------------------------------------------------------------- */
-
-export type WorkVariant = "gallery" | "explode" | "projector";
 
 const FONT = "/fonts/helvetiker_bold.typeface.json";
 
-/** Framing per variant. Each composition is a different size and shape, so
- *  one camera cannot serve all three. */
-const CAM: Record<WorkVariant, { pos: [number, number, number]; at: number }> = {
-  gallery: { pos: [0, 2.6, 16], at: 1.3 },
-  explode: { pos: [0, 4.6, 15.5], at: 2.6 },
-  projector: { pos: [0, 2.4, 13], at: 1.8 },
+type Reel = { still?: string; clip?: string };
+type Item = {
+  title: string;
+  years: string;
+  blurb: string;
+  stack: string[];
+  repo: string;
+  reel: Reel;
+  face: string;
 };
 
-/** Each project's face. Real logos we already ship, no new art. */
+/** The rack, in the order they were made. Face is a logo we already ship. */
 const FACE: Record<string, string> = {
   CarScout: "FastAPI",
   "Project Horizon": "Unity",
@@ -38,190 +43,251 @@ const FACE: Record<string, string> = {
   CarStatus: "JavaScript",
 };
 
-/** CarScout's actual stack, bottom to top, for the exploded view. */
-const STACK = ["PostgreSQL", "DynamoDB", "Docker", "FastAPI", "React"];
+const SCREEN_W = 9.4;
+const SCREEN_H = 5.29; // 16:9
 
-function useLogo(label: string): LogoPart[] | null {
-  const [, bump] = useState(0);
-  return brandLogo(LEGENDS[label]?.logo, () => bump((n) => n + 1));
+/* Depth is the whole composition here. Everything used to sit far too near
+   the lens - the projector filled the frame and the rack fell off the bottom
+   entirely. Screen upstage, projector mid, rack downstage, and the camera far
+   enough back that all three are in one shot. */
+const SCREEN_Z = -2.4;
+const PROJ_Z = 1.9;
+const RACK_Y = -1.2;
+const RACK_Z = 4.6;
+
+/* ------------------------------- the screen ------------------------------- */
+
+/** A film leader, drawn rather than fetched: countdown ring, crosshair, and
+ *  the project name. Stands in for footage that does not exist yet. */
+function leaderTexture(title: string): THREE.CanvasTexture {
+  const W = 1024;
+  const H = Math.round((W * SCREEN_H) / SCREEN_W);
+  const c = document.createElement("canvas");
+  c.width = W;
+  c.height = H;
+  const g = c.getContext("2d")!;
+
+  g.fillStyle = "#0e0e10";
+  g.fillRect(0, 0, W, H);
+
+  g.strokeStyle = "rgba(236,233,226,0.5)";
+  g.lineWidth = 2;
+  const cx = W / 2;
+  const cy = H / 2;
+  for (const r of [H * 0.34, H * 0.24]) {
+    g.beginPath();
+    g.arc(cx, cy, r, 0, Math.PI * 2);
+    g.stroke();
+  }
+  g.beginPath();
+  g.moveTo(cx, cy - H * 0.44);
+  g.lineTo(cx, cy + H * 0.44);
+  g.moveTo(cx - W * 0.44, cy);
+  g.lineTo(cx + W * 0.44, cy);
+  g.stroke();
+
+  g.fillStyle = "#ece9e2";
+  g.textAlign = "center";
+  g.textBaseline = "middle";
+  g.font = `700 ${H * 0.2}px "JetBrains Mono", ui-monospace, monospace`;
+  g.fillText(title, cx, cy - H * 0.02);
+  g.font = `500 ${H * 0.055}px "JetBrains Mono", ui-monospace, monospace`;
+  g.fillStyle = "rgba(236,233,226,0.55)";
+  g.fillText("REEL NOT LOADED", cx, cy + H * 0.14);
+
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
 }
 
-/** A logo, extruded, fitted into `size` and standing upright. */
-function Mark({ label, size = 1, y = 0 }: { label: string; size?: number; y?: number }) {
-  const parts = useLogo(label);
-  if (!parts) return null;
-  return (
-    <group position={[0, y, 0]} scale={size}>
-      {parts.map((p, i) => (
-        <mesh key={i} geometry={p.geo} castShadow>
-          <meshStandardMaterial color={p.color} roughness={0.35} metalness={0.1} />
-        </mesh>
-      ))}
-    </group>
-  );
+function useReel(item: Item) {
+  const [tex, setTex] = useState<THREE.Texture | null>(null);
+
+  useEffect(() => {
+    let dead = false;
+    let video: HTMLVideoElement | null = null;
+
+    if (item.reel.clip) {
+      video = document.createElement("video");
+      video.src = item.reel.clip;
+      video.loop = true;
+      video.muted = true;
+      video.playsInline = true;
+      const vt = new THREE.VideoTexture(video);
+      vt.colorSpace = THREE.SRGBColorSpace;
+      void video.play().catch(() => {});
+      setTex(vt);
+    } else if (item.reel.still) {
+      new THREE.TextureLoader().load(item.reel.still, (t) => {
+        if (dead) return;
+        t.colorSpace = THREE.SRGBColorSpace;
+        setTex(t);
+      });
+    } else {
+      setTex(leaderTexture(item.title));
+    }
+
+    return () => {
+      dead = true;
+      video?.pause();
+    };
+  }, [item]);
+
+  return tex;
 }
 
-function Caption({ text, y, size = 0.3 }: { text: string; y: number; size?: number }) {
-  const ref = useRef<THREE.Group>(null);
-  return (
-    <group ref={ref} position={[0, y, 0.4]}>
-      <Text3D font={FONT} size={size} height={size * 0.28} bevelEnabled bevelSize={size * 0.02} bevelThickness={size * 0.03}>
-        {text}
-        <meshStandardMaterial color="#f2f1ee" roughness={0.4} metalness={0.15} />
-      </Text3D>
-    </group>
-  );
-}
+function Screen({ item }: { item: Item }) {
+  const tex = useReel(item);
+  const mat = useRef<THREE.MeshBasicMaterial>(null);
+  const fade = useRef(0);
 
-/* ------------------------------- A. gallery ------------------------------- */
-
-function Gallery() {
-  const all = useMemo(() => [{ title: flagship.title }, ...projects], []);
-  const [hot, setHot] = useState<number | null>(null);
-  const plinth = useMemo(() => new RoundedBoxGeometry(1.5, 2.2, 1.5, 4, 0.06), []);
-
-  return (
-    <group position={[0, -1.4, 0]}>
-      {all.map((p, i) => {
-        const x = (i - (all.length - 1) / 2) * 2.9;
-        const lit = hot === i;
-        return (
-          <group key={p.title} position={[x, 0, 0]}>
-            <mesh
-              geometry={plinth}
-              position={[0, 1.1, 0]}
-              castShadow
-              receiveShadow
-              onPointerOver={() => setHot(i)}
-              onPointerOut={() => setHot((h) => (h === i ? null : h))}
-            >
-              <meshStandardMaterial color={lit ? "#2a2a31" : "#1a1a1f"} roughness={0.75} />
-            </mesh>
-            <Mark label={FACE[p.title] ?? "React"} size={1.05} y={lit ? 3.15 : 3} />
-            <group position={[-0.95, 2.35, 0.78]}>
-              <Text3D font={FONT} size={0.19} height={0.05}>
-                {p.title}
-                <meshStandardMaterial color={lit ? "#ffffff" : "#8d8f96"} roughness={0.5} />
-              </Text3D>
-            </group>
-          </group>
-        );
-      })}
-    </group>
-  );
-}
-
-/* ------------------------------- B. explode ------------------------------- */
-
-function Explode() {
-  const [open, setOpen] = useState(true);
-  const slab = useMemo(() => new RoundedBoxGeometry(3.4, 0.16, 2.2, 4, 0.05), []);
-  const gap = useRef(0);
-
+  // the lamp catching after a reel change
+  useEffect(() => {
+    fade.current = 0;
+  }, [item]);
   useFrame((_, dt) => {
-    gap.current += ((open ? 1 : 0) - gap.current) * (1 - Math.exp(-dt * 4));
+    fade.current += (1 - fade.current) * (1 - Math.exp(-dt * 6));
+    if (mat.current) mat.current.opacity = fade.current;
   });
 
   return (
-    <group position={[0, -1.2, 0]} rotation={[0, -0.42, 0]} onClick={() => setOpen((o) => !o)}>
-      {STACK.map((label, i) => (
-        <Layer key={label} label={label} index={i} slab={slab} gap={gap} />
-      ))}
-      <group position={[-2.6, 5.1, 0]}>
-        <Text3D font={FONT} size={0.42} height={0.12} bevelEnabled bevelSize={0.008} bevelThickness={0.012}>
-          CarScout
-          <meshStandardMaterial color="#f2f1ee" roughness={0.4} metalness={0.15} />
-        </Text3D>
-      </group>
+    <group position={[0, 2.95, SCREEN_Z]}>
+      {/* the surround, so the bright frame has an edge to sit in */}
+      <mesh position={[0, 0, -0.08]}>
+        <planeGeometry args={[SCREEN_W + 0.5, SCREEN_H + 0.5]} />
+        <meshStandardMaterial color="#0a0a0c" roughness={1} />
+      </mesh>
+      {tex && (
+        <mesh>
+          <planeGeometry args={[SCREEN_W, SCREEN_H]} />
+          <meshBasicMaterial ref={mat} map={tex} transparent toneMapped={false} />
+        </mesh>
+      )}
     </group>
   );
 }
 
-function Layer({
-  label,
-  index,
-  slab,
-  gap,
+/* ----------------------------- the projector ------------------------------ */
+
+function Projector({ on }: { on: boolean }) {
+  const body = useMemo(() => new RoundedBoxGeometry(1.7, 0.95, 2.3, 4, 0.12), []);
+  const spot = useRef<THREE.SpotLight>(null);
+  const lamp = useRef(0);
+
+  useFrame((_, dt) => {
+    // a lamp does not fade, it catches - fast up, with a stutter
+    lamp.current += ((on ? 1 : 0) - lamp.current) * (1 - Math.exp(-dt * 9));
+    if (spot.current) spot.current.intensity = 55 * lamp.current;
+  });
+
+  return (
+    <group position={[0, -0.62, PROJ_Z]}>
+      <mesh geometry={body} castShadow>
+        <meshStandardMaterial color="#24242a" roughness={0.45} metalness={0.5} />
+      </mesh>
+      {/* lens */}
+      <mesh position={[0, 0.02, -1.25]} rotation={[Math.PI / 2, 0, 0]} castShadow>
+        <cylinderGeometry args={[0.3, 0.37, 0.55, 28]} />
+        <meshStandardMaterial color="#131317" roughness={0.3} metalness={0.7} />
+      </mesh>
+      {/* feed and take-up spools, because it should read as a projector */}
+      {[-0.45, 0.45].map((x) => (
+        <mesh key={x} position={[x, 0.62, 0.1]} rotation={[Math.PI / 2, 0, 0]} castShadow>
+          <cylinderGeometry args={[0.42, 0.42, 0.1, 24]} />
+          <meshStandardMaterial color="#2e2e36" roughness={0.5} metalness={0.4} />
+        </mesh>
+      ))}
+      <spotLight
+        ref={spot}
+        position={[0, 0.02, -1.4]}
+        target-position={[0, 3.4, -7]}
+        angle={0.42}
+        penumbra={0.55}
+        intensity={0}
+        distance={20}
+        color="#eaf0ff"
+      />
+    </group>
+  );
+}
+
+/* ----------------------------- the cartridges ----------------------------- */
+
+function Cartridge({
+  item,
+  slot,
+  loaded,
+  onPick,
 }: {
-  label: string;
-  index: number;
-  slab: THREE.BufferGeometry;
-  gap: React.MutableRefObject<number>;
+  item: Item;
+  slot: number;
+  loaded: boolean;
+  onPick: () => void;
 }) {
   const g = useRef<THREE.Group>(null);
   const [hot, setHot] = useState(false);
-  useFrame(() => {
-    // stacked flat when closed, pulled apart when open
-    if (g.current) g.current.position.y = index * (0.2 + gap.current * 1.1);
+  const shell = useMemo(() => new RoundedBoxGeometry(1.9, 0.28, 1.25, 4, 0.07), []);
+  const [, bump] = useState(0);
+  const parts = brandLogo(LEGENDS[item.face]?.logo, () => bump((n) => n + 1));
+
+  const home = useMemo<[number, number, number]>(
+    () => [(slot - 1.5) * 2.35, RACK_Y, RACK_Z],
+    [slot]
+  );
+  const target = useMemo(() => new THREE.Vector3(), []);
+
+  useFrame((_, dt) => {
+    if (!g.current) return;
+    // loaded rides on top of the projector; the rest wait in the rack, and
+    // lift a little when pointed at
+    target.set(...home);
+    if (loaded) target.set(0, 0.02, PROJ_Z);
+    else if (hot) target.y += 0.22;
+
+    const k = 1 - Math.exp(-dt * 7);
+    g.current.position.lerp(target, k);
+    const tilt = loaded ? 0 : -0.28;
+    g.current.rotation.x += (tilt - g.current.rotation.x) * k;
   });
+
   return (
-    <group ref={g}>
+    <group ref={g} position={home} rotation={[-0.28, 0, 0]}>
       <mesh
-        geometry={slab}
+        geometry={shell}
         castShadow
         receiveShadow
-        onPointerOver={() => setHot(true)}
+        onPointerOver={(e) => {
+          e.stopPropagation();
+          setHot(true);
+        }}
         onPointerOut={() => setHot(false)}
+        onClick={(e) => {
+          e.stopPropagation();
+          onPick();
+        }}
       >
         <meshStandardMaterial
-          color={hot ? "#33333d" : "#1d1d23"}
-          roughness={0.6}
-          metalness={0.15}
+          color={loaded ? "#3a3a44" : hot ? "#2f2f38" : "#1e1e24"}
+          roughness={0.55}
+          metalness={0.3}
         />
       </mesh>
-      <group position={[-1.15, 0.09, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-        <Mark label={label} size={0.62} />
-      </group>
-      <group position={[-0.2, 0.1, 0.35]} rotation={[-Math.PI / 2, 0, 0]}>
-        <Text3D font={FONT} size={0.24} height={0.03}>
-          {label}
-          <meshStandardMaterial color={hot ? "#ffffff" : "#9a9ca4"} roughness={0.5} />
+
+      {/* the label: the project's tech mark, lying on the cartridge face */}
+      {parts && (
+        <group position={[-0.62, 0.16, 0]} rotation={[-Math.PI / 2, 0, 0]} scale={0.42}>
+          {parts.map((p, i) => (
+            <mesh key={i} geometry={p.geo}>
+              <meshStandardMaterial color={p.color} roughness={0.4} metalness={0.1} />
+            </mesh>
+          ))}
+        </group>
+      )}
+      <group position={[-0.3, 0.15, 0.12]} rotation={[-Math.PI / 2, 0, 0]}>
+        <Text3D font={FONT} size={0.145} height={0.02}>
+          {item.title}
+          <meshStandardMaterial color={hot || loaded ? "#ffffff" : "#8f9199"} roughness={0.5} />
         </Text3D>
-      </group>
-    </group>
-  );
-}
-
-/* ------------------------------ C. projector ------------------------------ */
-
-function Projector() {
-  const tex = useLoader(THREE.TextureLoader, "/shots/carscout.jpg");
-  tex.colorSpace = THREE.SRGBColorSpace;
-  const body = useMemo(() => new RoundedBoxGeometry(1.5, 0.8, 2.1, 4, 0.1), []);
-
-  return (
-    <group position={[0, -0.6, 0]}>
-      {/* the screen */}
-      <group position={[0, 2.4, -3]}>
-        <mesh position={[0, 0, -0.06]}>
-          <planeGeometry args={[8.6, 5.0]} />
-          <meshStandardMaterial color="#0c0c0f" roughness={1} />
-        </mesh>
-        <mesh>
-          <planeGeometry args={[8.2, 4.7]} />
-          <meshBasicMaterial map={tex} toneMapped={false} />
-        </mesh>
-      </group>
-      <Caption text="CarScout" y={-0.9} size={0.42} />
-
-      {/* the projector itself, throwing the beam */}
-      <group position={[0, -1.1, 4.2]}>
-        <mesh geometry={body} castShadow>
-          <meshStandardMaterial color="#26262c" roughness={0.5} metalness={0.4} />
-        </mesh>
-        <mesh position={[0, 0, -1.15]} rotation={[Math.PI / 2, 0, 0]}>
-          <cylinderGeometry args={[0.28, 0.34, 0.5, 24]} />
-          <meshStandardMaterial color="#15151a" roughness={0.35} metalness={0.6} />
-        </mesh>
-        <spotLight
-          position={[0, 0, -1.3]}
-          target-position={[0, 3.5, -7]}
-          angle={0.5}
-          penumbra={0.6}
-          intensity={40}
-          distance={16}
-          color="#eaf0ff"
-        />
       </group>
     </group>
   );
@@ -229,42 +295,77 @@ function Projector() {
 
 /* --------------------------------- scene ---------------------------------- */
 
-export default function WorkScene({ variant }: { variant: WorkVariant }) {
+function Stage({ onSelect }: { onSelect: (i: Item) => void }) {
+  const items = useMemo<Item[]>(() => {
+    const all = [flagship, ...projects] as unknown as Item[];
+    return all.map((p) => ({ ...p, face: FACE[p.title] ?? "React" }));
+  }, []);
+  const [loaded, setLoaded] = useState(0);
+  const [running, setRunning] = useState(false);
+
+  // strike the lamp shortly after the section arrives
+  useEffect(() => {
+    const t = setTimeout(() => setRunning(true), 600);
+    return () => clearTimeout(t);
+  }, []);
+
+  useEffect(() => onSelect(items[loaded]), [loaded, items, onSelect]);
+
+  return (
+    <>
+      <Screen item={items[loaded]} />
+      <Projector on={running} />
+      {items.map((it, i) => (
+        <Cartridge
+          key={it.title}
+          item={it}
+          slot={i}
+          loaded={i === loaded}
+          onPick={() => {
+            if (i === loaded) return;
+            setLoaded(i);
+            playStageLight(); // the same contactor clunk as the stage lamp
+          }}
+        />
+      ))}
+    </>
+  );
+}
+
+export default function WorkScene({ onSelect }: { onSelect: (i: Item) => void }) {
   return (
     <div className="workscene">
       <Canvas
         shadows
         dpr={[1, 1.75]}
-        camera={{ position: CAM[variant].pos, fov: 32 }}
+        camera={{ position: [0, 3.8, 15.2], fov: 38 }}
         gl={{ alpha: true, antialias: true }}
         onCreated={({ gl, camera }) => {
           gl.toneMapping = THREE.ACESFilmicToneMapping;
           gl.toneMappingExposure = 1.0;
-          camera.lookAt(0, CAM[variant].at, 0);
+          camera.lookAt(0, 1.2, 0);
         }}
       >
-        <ambientLight intensity={0.5} color="#c9d2e2" />
+        <ambientLight intensity={0.32} color="#c9d2e2" />
         <spotLight
-          position={[3, 12, 8]}
-          angle={0.7}
+          position={[4, 11, 9]}
+          angle={0.75}
           penumbra={0.9}
-          intensity={520}
+          intensity={360}
           decay={1.6}
           color="#f4f2ee"
           castShadow
           shadow-mapSize={[1024, 1024]}
         />
-        <directionalLight position={[-5, 4, 6]} intensity={0.5} color="#aebacc" />
+        <directionalLight position={[-6, 4, 7]} intensity={0.35} color="#aebacc" />
 
-        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -1.45, 0]} receiveShadow>
+        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -1.5, 0]} receiveShadow>
           <planeGeometry args={[60, 60]} />
           <meshStandardMaterial color="#121214" roughness={0.95} />
         </mesh>
 
         <Suspense fallback={null}>
-          {variant === "gallery" && <Gallery />}
-          {variant === "explode" && <Explode />}
-          {variant === "projector" && <Projector />}
+          <Stage onSelect={onSelect} />
         </Suspense>
       </Canvas>
     </div>

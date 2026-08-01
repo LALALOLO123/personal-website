@@ -1112,3 +1112,35 @@ html {
 .workscene canvas {
   display: block;
 }
+
+/* the loaded reel's notes, kept clear of the beam */
+.reelnote {
+  position: absolute;
+  left: min(5vw, 3rem);
+  bottom: 14vh;
+  z-index: 2;
+  max-width: 34ch;
+  pointer-events: none;
+}
+.reelnote__meta {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin: 0 0 0.5rem;
+}
+.reelnote__blurb {
+  margin: 0;
+  color: var(--ink);
+  font-size: clamp(0.9rem, 1vw, 1.1rem);
+  line-height: 1.6;
+}
+.reelnote__stack {
+  margin: 0.7rem 0 0;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+}
