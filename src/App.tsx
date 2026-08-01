@@ -4,6 +4,8 @@ import "./App.css";
 import Cursor from "./components/Cursor";
 // Smoke tests only. Lazy, so three.js never reaches the main chunk.
 const WorkScene = lazy(() => import("./components/WorkScene"));
+// prototype: generated room as a plate, live content warped onto its screen
+const WorkPlate = lazy(() => import("./components/WorkPlate"));
 import KeyboardSection from "./components/KeyboardSection";
 import { SplitText, Magnetic } from "./components/Bits";
 import { useSectionNav } from "./hooks/useSectionNav";
@@ -149,6 +151,7 @@ function WorkSection({ active }: { active: boolean }) {
   const reduce = useReducedMotion();
   const state = active || reduce ? "show" : "hidden";
   const [shown, setShown] = useState<any>(null);
+  const usePlate = new URLSearchParams(location.search).get("work") === "plate";
 
   return (
     <div className="section shell artifact">
@@ -157,7 +160,7 @@ function WorkSection({ active }: { active: boolean }) {
       </motion.p>
 
       <Suspense fallback={null}>
-        <WorkScene onSelect={setShown} />
+        {usePlate ? <WorkPlate onSelect={setShown} /> : <WorkScene onSelect={setShown} />}
       </Suspense>
 
       {/* the reel notes, out of the way of the beam */}
