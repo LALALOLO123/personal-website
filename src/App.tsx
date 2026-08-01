@@ -6,7 +6,7 @@ import KeyboardSection from "./components/KeyboardSection";
 import { SplitText, ShinyText, Magnetic } from "./components/Bits";
 import { useSectionNav } from "./hooks/useSectionNav";
 import { soundEnabled, toggleSound } from "./data/keySound";
-import { profile, skills, flagship } from "./data/content";
+import { profile, skills, flagship, projects } from "./data/content";
 
 const ease = [0.16, 1, 0.3, 1] as const;
 
@@ -159,10 +159,12 @@ function ArtifactScene({ active }: { active: boolean }) {
   return (
     <div className="section shell artifact">
       <motion.p className="section__label" variants={rise} initial="hidden" animate={state} custom={0}>
-        Currently proudest of
+        Selected work
       </motion.p>
 
-      <motion.div variants={rise} initial="hidden" animate={state} custom={1}>
+      <div className="work">
+
+      <motion.div className="work__lead" variants={rise} initial="hidden" animate={state} custom={1}>
         <a
           ref={cardRef}
           className="artifact__card spotlight"
@@ -197,13 +199,40 @@ function ArtifactScene({ active }: { active: boolean }) {
         </a>
       </motion.div>
 
+        {/* The rest, as a list. The featured card carries the detail; these
+            carry the range - a game, a hackathon build, a hardware CLI. */}
+        <ol className="work__list">
+          {projects.map((p, i) => (
+            <motion.li
+              key={p.title}
+              className="proj"
+              initial={{ opacity: 0, y: 16 }}
+              animate={active ? { opacity: 1, y: 0 } : { opacity: 0, y: 16 }}
+              transition={{ duration: 0.55, ease, delay: 0.3 + i * 0.09 }}
+            >
+              <a href={p.repo} target="_blank" rel="noreferrer" data-cursor="hover">
+                <span className="proj__year">{p.years}</span>
+                <span className="proj__body">
+                  <span className="proj__title">{p.title}</span>
+                  <span className="proj__blurb">{p.blurb}</span>
+                  <span className="proj__stack">
+                    {p.stack.map((s) => (
+                      <span key={s}>{s}</span>
+                    ))}
+                  </span>
+                </span>
+              </a>
+            </motion.li>
+          ))}
+        </ol>
+      </div>
+
       <motion.p className="artifact__aside" variants={rise} initial="hidden" animate={state} custom={3}>
-        There&rsquo;s more on{" "}
+        All of it is on{" "}
         <a href={profile.github} target="_blank" rel="noreferrer" data-cursor="hover">
           GitHub
-        </a>{" "}
-        &mdash; a compiler backend, a Unity game, some smaller things.{" "}
-        <span className="dim">I&rsquo;d rather show you one that works.</span>
+        </a>
+        . <span className="dim">I&rsquo;d rather show you one that works.</span>
       </motion.p>
     </div>
   );

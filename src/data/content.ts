@@ -43,6 +43,41 @@ export const skills = [
   "Git",
 ];
 
+/**
+ * Everything else, newest work first.
+ *
+ * Only real repos, and the ROLE is stated where it was not solo - Wild West
+ * was a team hackathon build and Brian wrote the frontend, so it says so.
+ * Dates are when the work happened, not when the repo was pushed to GitHub:
+ * Project Horizon has been going since 2023 but the repo was created in 2026.
+ */
+export const projects = [
+  {
+    title: "Project Horizon",
+    years: "2023 — now",
+    repo: "https://github.com/jiacheng-fu/project-horizon",
+    blurb:
+      "A narrative exploration game, solo. Branching dialogue with voiceover sync, third-person traversal, and a life system.",
+    stack: ["C#", "Unity"],
+  },
+  {
+    title: "Wild West Party Game",
+    years: "2024",
+    repo: "https://github.com/jiacheng-fu/wild-west-party-game",
+    blurb:
+      "Live multiplayer party game built in 24 hours at HowdyHack. Team project — I built the frontend: inter-scene mechanics, transitions, and UI across distinct client states.",
+    stack: ["TypeScript", "React"],
+  },
+  {
+    title: "CarStatus",
+    years: "2026",
+    repo: "https://github.com/jiacheng-fu/CarStatus",
+    blurb:
+      "A CLI that reads a BMW's live status over the Smartcar API — odometer, fuel and battery, location.",
+    stack: ["JavaScript", "Smartcar API"],
+  },
+];
+
 /** One artifact, chosen because you can click it and it responds. */
 export const flagship = {
   title: "CarScout",
