@@ -17,7 +17,7 @@ import { playPress, playRelease, toggleSound } from "../data/keySound";
    and tooling recedes to the back.
    --------------------------------------------------------------------------- */
 
-type CapAction = "github" | "email" | "linkedin" | "sound" | "wave";
+type CapAction = "github" | "email" | "linkedin" | "source" | "wave";
 type Cap = { label: string; w: number; blank?: boolean; action?: CapAction };
 
 /* Every row is exactly ROW_W wide and only the two END caps are irregular -
@@ -27,7 +27,7 @@ type Cap = { label: string; w: number; blank?: boolean; action?: CapAction };
    Rows are grouped by kind: languages, then web and UI, then data and cloud,
    then systems and graphics, then the function row. Everything here is on
    Brian's resume or demonstrably in his repos. */
-const ROW_W = 12; // wide enough that 4 rows keep real keyboard proportions
+const ROW_W = 13; // five rows deep, so the board needs the width to stay a board
 
 const skillRow = (labels: string[]): Cap[] => {
   const edge = (ROW_W - (labels.length - 2)) / 2;
@@ -39,18 +39,20 @@ const skillRow = (labels: string[]): Cap[] => {
 
 const ROWS: { caps: Cap[] }[] = [
   // languages, in the order he'd list them
-  { caps: skillRow(["C++", "Java", "Python", "TypeScript", "JavaScript", "C#", "Haskell", "Bash", "SQL", "HTML", "CSS"]) },
-  // the full-stack layer: framework, runtime, API, database
-  { caps: skillRow(["React", "Next.js", "Vite", "Node", "Deno", "FastAPI", "REST APIs", "PostgreSQL", "Supabase", "DynamoDB"]) },
-  // cloud, tooling, systems and graphics
-  { caps: skillRow(["AWS Lambda", "Vercel", "Row-Level Security", "Docker", "Git", "CI/CD", "Playwright", "LLVM", "Unity", "GLSL", "WebGL"]) },
+  { caps: skillRow(["C++", "C#", "Java", "Python", "TypeScript", "JavaScript", "Swift", "Haskell", "Bash", "SQL"]) },
+  // the browser: markup, framework, build, runtime, and what draws in it
+  { caps: skillRow(["HTML", "CSS", "React", "Next.js", "Vite", "Node", "npm", "Deno", "Three.js", "WebGL", "Unity"]) },
+  // backend, data and cloud
+  { caps: skillRow(["FastAPI", "Poetry", "PyTorch", "OpenRouter", "PostgreSQL", "Supabase", "DynamoDB", "AWS Lambda", "API Gateway", "Vercel"]) },
+  // systems, tooling, and the silicon side from United Micro / Bridgecom
+  { caps: skillRow(["Docker", "Linux", "Vim", "Git", "GitHub Actions", "Playwright", "LLVM", "SystemVerilog", "VHDL", "SystemRDL"]) },
   {
     caps: [
-      { label: "GitHub", w: 1.5, action: "github" },
-      { label: "Email", w: 1.5, action: "email" },
+      { label: "GitHub", w: 1.75, action: "github" },
+      { label: "Email", w: 1.75, action: "email" },
       { label: "shipped, not read about", w: 6, blank: true, action: "wave" },
-      { label: "Sound", w: 1.5, action: "sound" },
-      { label: "LinkedIn", w: 1.5, action: "linkedin" },
+      { label: "Source", w: 1.75, action: "source" },
+      { label: "LinkedIn", w: 1.75, action: "linkedin" },
     ],
   },
 ];
@@ -62,9 +64,11 @@ const BASE = U - GAP; // a 1u cap footprint
 const CAP_H = HEIGHT_RATIO * BASE; // his cap proportions exactly
 
 /* Uniform rows, no sculpt: the toy-like grid reads cleaner at product scale
-   than a realistic Cherry profile ever did. */
-const ROW_LIFT = [0.3, 0.3, 0.3, 0.3];
-const ROW_TILT = [0, 0, 0, 0];
+   than a realistic Cherry profile ever did. Flat values rather than a
+   per-row table, which silently returned undefined the moment a row was
+   added. */
+const ROW_LIFT = 0.3;
+const ROW_TILT = 0;
 
 /* The product pose from Brian's reference photo: standing on one corner,
    LONG SIDE VERTICAL with a slight lean, face toward the camera. Composed in
@@ -96,6 +100,15 @@ const STAGE = { lamp: 1 };
 
 /** Timestamp of the last spacebar hit; every key ripples off it. */
 const WAVE = { at: 0 };
+
+/** Someone who asked for less motion gets none of the parallax. */
+const STILL =
+  typeof window !== "undefined" &&
+  window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+
+// scratch, so the parallax allocates nothing per frame
+const parQ = new THREE.Quaternion();
+const parE = new THREE.Euler();
 
 type Placed = Cap & { x: number; z: number; row: number; capW: number };
 
@@ -185,7 +198,23 @@ function legendTexture(cap: Cap): THREE.CanvasTexture | null {
   ctx.textBaseline = "middle";
 
   const L = LEGENDS[cap.label];
-  if (cap.blank) {
+  if (cap.label === "LinkedIn") {
+    /* LinkedIn's mark is a rounded square with the letters knocked OUT of it.
+       Drawing the letters alone - which is all a text legend can do - just
+       reads as the word "in". Simple Icons carries no LinkedIn path
+       (trademark), so it is punched here instead: fill the tile, then erase
+       the type so the cap colour shows through. */
+    const s = Math.min(W, S) * 0.66;
+    const x0 = (W - s) / 2;
+    const y0 = (S - s) / 2;
+    ctx.beginPath();
+    ctx.roundRect(x0, y0, s, s, s * 0.2);
+    ctx.fill();
+    ctx.globalCompositeOperation = "destination-out";
+    ctx.font = `700 ${s * 0.6}px "JetBrains Mono", ui-monospace, monospace`;
+    ctx.fillText("in", W / 2, S / 2 + s * 0.03);
+    ctx.globalCompositeOperation = "source-over";
+  } else if (cap.blank) {
     // the spacebar motto: letterspaced type, shrunk to fit
     const spaced = cap.label.split("").join(" ");
     const face = (n: number) => `500 ${n}px "JetBrains Mono", ui-monospace, monospace`;
@@ -263,45 +292,68 @@ function legibleHex(hex: string): string {
 /** The charcoal every cap falls back to. */
 const NEUTRAL = CANDYWAY.cap;
 
-/* legends.ts stores INK colours - picked so a mark stays visible on a pale
-   cap - which is not the same thing as the brand's colour. Where the two
-   differ, the real brand colour is given here, because the cap is what wears
-   it now. Anything without a brand of its own gets charcoal, the way the
-   original treats its modifier and symbol caps. */
+/* legends.ts now publishes brand colours untouched, so this only covers what
+   it cannot: text legends (whose hex is the ink colour, not a brand colour),
+   Java, and the keys with no brand at all. */
 const CAP_TINT: Record<string, string> = {
-  Java: "#5382A1", // the classic Java blue
-  "Next.js": "#000000", // a black wordmark, so this lands on charcoal
-  Deno: "#000000", // white dino on black, likewise
-  Vite: "#646CFF",
-  LLVM: "#262D3A",
-  WebGL: "#990000",
+  // simple-icons publishes OpenJDK as black; the Java logo's own blue keeps
+  // the languages row from turning into a wall of charcoal.
+  Java: "#5382A1",
   "C#": "#512BD4", // the .NET purple it ships under
-  GLSL: "#5586A4", // OpenGL blue
   LinkedIn: "#0A66C2",
-  SQL: NEUTRAL,
-  "REST APIs": NEUTRAL,
-  "Row-Level Security": NEUTRAL,
+  /* Open standards with no logo and no brand colour, so these are chosen
+     rather than sourced - a silicon palette that reads as one group. */
+  SystemVerilog: "#1F7A8C",
+  VHDL: "#B5651D",
+  SystemRDL: "#6A6FA8",
+  SQL: "#3E5C76",
+  // the function keys stay charcoal, like the modifiers on a real board
   Email: NEUTRAL,
-  Sound: NEUTRAL,
+  Source: NEUTRAL,
 };
 
-/* A white mark needs a cap it can sit on. Outside this window - a near-black
-   brand like Vercel or GitHub, a near-white one like Unity or Deno, or a
-   yellow like JavaScript's - no amount of tinting saves it, so the cap goes
-   charcoal instead. Tinting the brand colour to force a fit is what made the
-   last pass look muddy; the original never does it. */
+/* The band a white legend can actually sit on. */
 const CAP_LUM_MIN = 0.05;
-const CAP_LUM_MAX = 0.62;
+const CAP_LUM_MAX = 0.55;
 
-/** The cap's colour: the brand's own, untouched, or charcoal when the brand
- *  cannot carry a white legend. */
+const hsl = { h: 0, s: 0, l: 0 };
+
+/** Pull an out-of-band brand into the band WITHOUT throwing its hue away, so
+ *  a yellow brand stays yellow instead of becoming yet another black key.
+ *  Only genuinely colourless brands fall through to charcoal. */
+function fitToCap(hex: string): string {
+  const c = new THREE.Color(hex);
+  c.getHSL(hsl, THREE.SRGBColorSpace);
+  // Vercel, Next.js, Deno, Three.js, Unity and GitHub are not "missing" a
+  // colour - their marks really are black or white. Nothing to preserve.
+  if (hsl.s < 0.14) return NEUTRAL;
+  c.setHSL(
+    hsl.h,
+    Math.max(hsl.s, 0.42),
+    THREE.MathUtils.clamp(hsl.l, 0.2, 0.38),
+    THREE.SRGBColorSpace
+  );
+  return `#${c.getHexString()}`;
+}
+
+/** The cap's colour: the brand's own where it can carry a white legend, a
+ *  deepened version of it where it cannot, charcoal only when there is no
+ *  colour to keep. */
 function capColor(label: string, blank?: boolean): string {
   if (blank) return NEUTRAL;
   const hex = CAP_TINT[label] ?? LEGENDS[label]?.hex;
   if (!hex) return NEUTRAL;
   const lum = luminance(hex);
-  return lum < CAP_LUM_MIN || lum > CAP_LUM_MAX ? NEUTRAL : hex;
+  return lum < CAP_LUM_MIN || lum > CAP_LUM_MAX ? fitToCap(hex) : hex;
 }
+
+/** Wordmarks normalise to their longest side, so a wide, short mark like
+ *  WebGL's ends up a thin strip on the cap. These get scaled back up. */
+const MARK_SCALE: Record<string, number> = {
+  WebGL: 1.85,
+  LLVM: 1.2,
+  OpenRouter: 1.1,
+};
 
 type KeyProps = {
   cap: Placed;
@@ -321,7 +373,7 @@ const Key = memo(function Key({ cap, geometry, texture, active, onEnter, onLeave
   const legendMat = useRef<THREE.MeshBasicMaterial>(null);
   const press = useRef(0);
 
-  const baseY = ROW_LIFT[cap.row];
+  const baseY = ROW_LIFT;
 
   // Resting legends sit slightly back from full brightness so the board reads
   // as one object; hovering brings the mark all the way up.
@@ -394,12 +446,12 @@ const Key = memo(function Key({ cap, geometry, texture, active, onEnter, onLeave
   const legendY = CAP_H / 2 + 0.004;
   const vector = cap.blank ? null : legendGeometry(cap.label);
   // marks sit at a consistent share of the 1u cap regardless of cap width
-  const markSize = BASE * 0.46;
+  const markSize = BASE * 0.46 * (MARK_SCALE[cap.label] ?? 1);
   const legendW = cap.capW * 0.78;
   const legendD = (U - GAP) * 0.7;
 
   return (
-    <group ref={group} position={[cap.x, baseY, cap.z]} rotation={[ROW_TILT[cap.row], 0, 0]}>
+    <group ref={group} position={[cap.x, baseY, cap.z]} rotation={[ROW_TILT, 0, 0]}>
       <mesh
         geometry={geometry}
         scale={BASE}
@@ -515,7 +567,6 @@ function Board({
   onHover,
   live = true,
   onLight,
-  onSound,
   armed = true,
 }: {
   onHover: (label: string | null) => void;
@@ -531,8 +582,6 @@ function Board({
    *  whole sequence so it plays again on the next visit rather than being a
    *  one-shot that leaves the board already standing. */
   armed?: boolean;
-  /** Reports the VOL key's new state so the caption can echo it. */
-  onSound?: (on: boolean) => void;
 }) {
   const { placed, width, depth } = useMemo(buildLayout, []);
   // leftmost cap edge: the ripple's origin for per-key stagger
@@ -542,6 +591,7 @@ function Board({
   const ambRef = useRef<THREE.AmbientLight>(null);
   const fillRef = useRef<THREE.DirectionalLight>(null);
   const rimRef = useRef<THREE.DirectionalLight>(null);
+  const par = useRef({ x: 0, y: 0 }); // smoothed pointer, for the parallax lean
   const startAt = useRef<number | null>(live ? null : -99); // null = waiting in the dark
   const litFired = useRef(!live);
 
@@ -568,7 +618,7 @@ function Board({
 
      It used ease-out cubic, whose velocity is at its MAXIMUM on frame one -
      the board snapped off the table from a dead stop. */
-  useFrame((state) => {
+  useFrame((state, dt) => {
     const g = boardGroup.current;
     if (!g) return;
 
@@ -622,6 +672,21 @@ function Board({
 
     g.quaternion.slerpQuaternions(FLAT_Q, FINAL_Q, u);
     g.position.lerpVectors(FLAT_POS, POSE_POS, u);
+
+    /* A few degrees of lean toward the pointer. premultiply, so it acts on
+       the finished pose in WORLD space - composed the other way it would go
+       through the board's own tumbled frame and read as a wobble instead of
+       parallax. Deliberately tiny: it should register as the board being a
+       real object in the room, not as an effect. */
+    if (!STILL) {
+      const k = 1 - Math.exp(-dt * 3.5); // slow follow, no snapping
+      par.current.x += (state.pointer.x - par.current.x) * k;
+      par.current.y += (state.pointer.y - par.current.y) * k;
+      parE.set(par.current.y * 0.045, par.current.x * 0.06, 0);
+      g.quaternion.premultiply(parQ.setFromEuler(parE));
+      g.position.x += par.current.x * 0.16;
+      g.position.y += par.current.y * 0.09;
+    }
   });
   const [active, setActive] = useState<string | null>(null);
 
@@ -683,14 +748,14 @@ function Board({
       case "email":
         window.location.href = "mailto:brian.fu123321@gmail.com";
         break;
-      case "sound":
-        onSound?.(toggleSound());
+      case "source":
+        window.open("https://github.com/jiacheng-fu/personal-website", "_blank", "noopener");
         break;
       case "wave":
         WAVE.at = performance.now() / 1000;
         break;
     }
-  }, [onSound]);
+  }, []);
 
   const activeCap = active ? placed.find((p) => p.label === active) : null;
 
@@ -753,7 +818,7 @@ function Board({
 
         {activeCap && !activeCap.blank && (
           <Html
-            position={[activeCap.x, ROW_LIFT[activeCap.row] + 0.66, activeCap.z]}
+            position={[activeCap.x, ROW_LIFT + 0.66, activeCap.z]}
             center
             zIndexRange={[20, 0]}
             wrapperClass="kb-label-wrap"
@@ -804,12 +869,24 @@ export default function Keyboard3D({
             light cone are painted by the section CSS behind this transparent
             canvas; the scene contributes the lit board, floor pool, shadow.
             Lights live inside Board so the switch-on sequence can drive them. */}
-        <Board onHover={setLabel} live={active} onLight={onLight} onSound={setSound} armed={active && !paused} />
+        <Board onHover={setLabel} live={active} onLight={onLight} armed={active && !paused} />
       </Canvas>
 
       <p className="kb__caption" aria-live="polite">
-        {label ?? (sound ? "Sound on." : "Hover a key.")}
+        {label ?? "Hover a key."}
       </p>
+
+      {/* A speaker keycap sat oddly among thirty logos, so the toggle lives
+          out here. Clicking it is also the gesture that unlocks audio. */}
+      <button
+        type="button"
+        className="kb__sound"
+        data-cursor="hover"
+        aria-pressed={sound}
+        onClick={() => setSound(toggleSound())}
+      >
+        sound {sound ? "on" : "off"}
+      </button>
     </div>
   );
 }

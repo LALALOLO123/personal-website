@@ -28,10 +28,15 @@ const MAP = [
   ["Next.js",             "nextdotjs"],
   ["Bash",                "gnubash"],
   ["Git",                 "git"],
-  ["CI/CD",               "githubactions"],
-  // Its mark is a wordmark - unreadable as a 256px raster, but the legends
-  // are vector geometry now, so it renders crisply.
-  ["WebGL",               "webgl"],
+  ["GitHub Actions",      "githubactions"],
+  ["Three.js",            "threedotjs"],
+  ["OpenRouter",          "openrouter"],
+  ["npm",                 "npm"],
+  ["Poetry",              "poetry"],
+  ["Vim",                 "vim"],
+  ["Linux",               "linux"],
+  ["PyTorch",             "pytorch"],
+  ["Swift",               "swift"],
   // bottom-row function keys
   ["GitHub",              "github"],
 ];
@@ -45,15 +50,12 @@ const CUSTOM = {
     // a browser window with a passing check - end-to-end testing
     path: "M21 3H3a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h18a1 1 0 0 0 1-1V4a1 1 0 0 0-1-1zm-1 16H4V9h16v10zM4 7V5h16v2H4zm6.6 9.8l-2.9-2.9 1.4-1.4 1.5 1.5 3.9-3.9 1.4 1.4-5.3 5.3z",
   },
-  "REST APIs": {
-    hex: "E8C37E",
-    // request out, response back
-    path: "M6.99 11L3 15l3.99 4v-3H14v-2H6.99v-3zM21 9l-3.99-4v3H10v2h7.01v3L21 9z",
-  },
-  "Row-Level Security": {
-    hex: "8FD3B6",
-    // shield: the row-level policy boundary
-    path: "M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 10.99h7c-.53 4.12-3.28 7.79-7 8.94V12H5V6.3l7-3.11v8.8z",
+  "API Gateway": {
+    // AWS's Networking & Content Delivery purple
+    hex: "8C4FFF",
+    // many callers in, one gate, one route out - solid subpaths only, no
+    // holes, because a filled ShapeGeometry triangulates those badly
+    path: "M10.6 2h2.8v20h-2.8zM2 6.2h4.6v2.4H2zM6.2 4.4l3.4 3-3.4 3zM2 15.4h4.6v2.4H2zM6.2 13.6l3.4 3-3.4 3zM14.6 10.8h3.8v2.4h-3.8zM18 9l3.4 3-3.4 3z",
   },
   SQL: {
     hex: "C8A2E0",
@@ -64,9 +66,10 @@ const CUSTOM = {
     hex: "E8C37E",
     path: "M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z",
   },
-  Sound: {
+  Source: {
     hex: "9CC0E7",
-    path: "M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z",
+    // angle brackets: this site's own repo
+    path: "M9.4 16.6 4.8 12l4.6-4.6L8 6l-6 6 6 6 1.4-1.4zm5.2 0 4.6-4.6-4.6-4.6L16 6l6 6-6 6-1.4-1.4z",
   },
   "AWS Lambda": {
     hex: "FF9900",
@@ -80,16 +83,22 @@ const CUSTOM = {
   },
 };
 
-// No mark exists (or the mark is a wordmark), so these are legends.
+/* No mark exists, so these get text legends. The HDLs are open standards with
+   no logo at all; LinkedIn's is trademarked and is drawn in legendTexture
+   instead (box with the letters knocked out). */
 const TEXT = {
-  GLSL: "9CC0E7",
   "LinkedIn": "7FB3E8",
   "C#": "F5A97F",
+  "SystemVerilog": "9CC0E7",
+  "VHDL": "9CC0E7",
+  "SystemRDL": "9CC0E7",
 };
 const TEXT_LEGEND = {
-  GLSL: "GLSL",
   "LinkedIn": "in",
   "C#": "C#",
+  "SystemVerilog": "SV",
+  "VHDL": "VHDL",
+  "SystemRDL": "RDL",
 };
 
 const out = {};
@@ -102,9 +111,12 @@ for (const [label, slug] of MAP) {
 for (const [label, v] of Object.entries(CUSTOM)) out[label] = v;
 for (const [label, hex] of Object.entries(TEXT)) out[label] = { text: TEXT_LEGEND[label], hex };
 
-// Brand black reads as a hole on a dark keycap. Lift the near-blacks.
-const LIFT = { Deno: "E8E4DC", "Next.js": "E8E4DC", OpenJDK: "E8E4DC", Java: "E8E4DC", LLVM: "9FB0C9", WebGL: "E06060" };
-for (const [k, hex] of Object.entries(LIFT)) if (out[k]) out[k].hex = hex;
+/* These hexes used to be nudged so a near-black brand would still read as a
+   MARK on a pale cap. The mark is white now and the cap wears the colour, so
+   lifting them here only produced washed-out caps and forced a pile of
+   corrections downstream. Left exactly as the brand publishes them: the ones
+   that are black (Deno, Next.js, OpenJDK, Three.js) land on charcoal in
+   Keyboard3D, which is what they should be. */
 
 const body = Object.entries(out)
   .map(([label, v]) => {

@@ -929,6 +929,31 @@
   bottom: 6vh;
 }
 
+/* the sound toggle, sitting just under the caption */
+.kb__sound {
+  position: absolute;
+  right: min(5vw, 3rem);
+  bottom: calc(6vh - 1.6rem);
+  z-index: 2;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 0.72rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.55s ease-out 0.05s, color 0.2s;
+}
+.panel--void.is-lit .kb__sound {
+  opacity: 1;
+}
+.kb__sound:hover {
+  color: var(--ink);
+}
+
 /* the loading skeleton must not glow in the void either */
 .panel--void .kb--skeleton::after {
   border-color: transparent;
