@@ -292,11 +292,13 @@ const Key = memo(function Key({ cap, geometry, texture, active, onEnter, onLeave
   // as one object; hovering brings the mark to its true brand colour.
   const [rest, brand, capRest, capHover] = useMemo(() => {
     if (KB_VARIANT === "candy" && !cap.blank) {
-      // white legend on a brand-coloured cap; hover brightens the cap itself
-      const white = new THREE.Color("#ffffff");
       const base = new THREE.Color(candyCap(cap.label));
+      // Pick the mark colour off the cap it sits on. A fixed white legend
+      // vanished on the pale caps; this guarantees contrast on every key.
+      const pale = 0.2126 * base.r + 0.7152 * base.g + 0.0722 * base.b > 0.42;
+      const mark = new THREE.Color(pale ? "#17171b" : "#ffffff");
       const hover = base.clone().offsetHSL(0, 0.02, 0.09);
-      return [white.clone().multiplyScalar(0.92), white, base, hover];
+      return [mark.clone().multiplyScalar(pale ? 1 : 0.92), mark, base, hover];
     }
     const b = new THREE.Color(legibleHex(cap.blank ? (KB_VARIANT === "dark" ? "#9a958a" : "#8a8578") : LEGENDS[cap.label]?.hex ?? "#d5d1c8"));
     return [b.clone().lerp(LEGEND_MUTE, 0.28), b, CAP_REST, CAP_HOVER];
@@ -561,10 +563,10 @@ function Board({
       }
     }
     STAGE.lamp = lamp;
-    if (spotRef.current) spotRef.current.intensity = 560 * lamp;
+    if (spotRef.current) spotRef.current.intensity = 880 * lamp;
     if (ambRef.current) ambRef.current.intensity = 0.34 * lamp;
-    if (fillRef.current) fillRef.current.intensity = 0.55 * lamp;
-    if (rimRef.current) rimRef.current.intensity = 0.7 * lamp;
+    if (fillRef.current) fillRef.current.intensity = 0.6 * lamp;
+    if (rimRef.current) rimRef.current.intensity = 0.62 * lamp;
 
     // -- board: flat and near the lens, then it recedes as it stands up --
     // Smootherstep (Perlin): 6x^5 - 15x^4 + 10x^3. Velocity AND acceleration
@@ -657,9 +659,9 @@ function Board({
       <ambientLight ref={ambRef} intensity={0} color="#dfe3ea" />
       <spotLight
         ref={spotRef}
-        position={[0.5, 14, 4]}
-        angle={0.4}
-        penumbra={0.85}
+        position={[0.5, 15, 5]}
+        angle={0.62}
+        penumbra={0.9}
         intensity={0}
         decay={1.6}
         color="#f4f2ee"
@@ -673,7 +675,7 @@ function Board({
       {/* the table the board lies on when the light finds it */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -5.4, 0]} receiveShadow>
         <planeGeometry args={[80, 80]} />
-        <meshStandardMaterial color="#1d1d1f" roughness={0.92} metalness={0.05} />
+        <meshStandardMaterial color="#121214" roughness={0.95} metalness={0.04} />
       </mesh>
 
       <group ref={boardGroup} quaternion={FINAL_Q} position={[0, 0.55, 0]} onPointerMissed={clear}>
