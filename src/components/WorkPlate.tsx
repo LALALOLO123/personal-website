@@ -45,6 +45,12 @@ const SCREEN_QUAD: Quad = [
   { x: 0.279, y: 0.694 },
 ];
 
+/* Where the projector's lens sits in the plate. The machine itself is the
+   generator's job; the light coming out of it is ours, because the beam has
+   to land exactly on a panel only we know the position of. Drag it with
+   &calib=1 once the real plate exists. */
+const LENS = { x: 0.808, y: 0.815 };
+
 /** The overlay's own pixel width, before it gets warped. Its HEIGHT is
  *  derived from the quad below, never fixed: if the two aspects disagree the
  *  homography silently stretches everything inside, which is what was
@@ -59,11 +65,30 @@ type Item = {
   reel: { still?: string; clip?: string };
 };
 
+/** Convex hull (monotone chain) - the beam's silhouette is the hull of the
+ *  lens plus the panel's four corners, whichever way round they sit. */
+function hull(pts: { x: number; y: number }[]) {
+  const p = [...pts].sort((a, b) => a.x - b.x || a.y - b.y);
+  const cross = (o: any, a: any, b: any) =>
+    (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
+  const build = (src: typeof p) => {
+    const out: typeof p = [];
+    for (const q of src) {
+      while (out.length > 1 && cross(out[out.length - 2], out[out.length - 1], q) <= 0) out.pop();
+      out.push(q);
+    }
+    out.pop();
+    return out;
+  };
+  return [...build(p), ...build([...p].reverse())];
+}
+
 export default function WorkPlate({ onSelect }: { onSelect: (i: Item) => void }) {
   const items = useMemo(() => [flagship, ...projects] as unknown as Item[], []);
   const [loaded, setLoaded] = useState(0);
   const [box, setBox] = useState({ w: 0, h: 0 });
   const [quad, setQuad] = useState<Quad>(SCREEN_QUAD);
+  const [lens, setLens] = useState(LENS);
   const hostRef = useRef<HTMLDivElement>(null);
 
   const calib = new URLSearchParams(location.search).get("calib") === "1";
@@ -110,6 +135,21 @@ export default function WorkPlate({ onSelect }: { onSelect: (i: Item) => void })
     })) as Quad;
     return cornerPin(CONTENT_W, contentH, px) ?? undefined;
   }, [view, quad, contentH]);
+
+  /* The throw: hull of the lens and the panel, drawn in the plate's cropped
+     space so it tracks the same crop the panel does. */
+  const beam = useMemo(() => {
+    if (!view) return null;
+    const toPx = (p: { x: number; y: number }) => ({
+      x: view.x + p.x * view.w,
+      y: view.y + p.y * view.h,
+    });
+    const pts = hull([toPx(lens), ...quad.map(toPx)]);
+    return {
+      points: pts.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" "),
+      lens: toPx(lens),
+    };
+  }, [view, quad, lens]);
 
   const item = items[loaded];
   const reel = item.reel.clip ?? item.reel.still;
@@ -158,6 +198,25 @@ export default function WorkPlate({ onSelect }: { onSelect: (i: Item) => void })
         {/* the composite: a real DOM layer, warped onto the screen in the
             picture. Blended rather than pasted, so it reads as light falling
             on a surface instead of a sticker. */}
+        {beam && (
+          <svg className="plate__beam" aria-hidden="true">
+            <defs>
+              <radialGradient
+                id="throw"
+                gradientUnits="userSpaceOnUse"
+                cx={beam.lens.x}
+                cy={beam.lens.y}
+                r={Math.max(box.w, box.h) * 0.85}
+              >
+                <stop offset="0" stopColor="#cfe0ff" stopOpacity="0.4" />
+                <stop offset="0.45" stopColor="#a8c4ff" stopOpacity="0.13" />
+                <stop offset="1" stopColor="#8fb0ff" stopOpacity="0" />
+              </radialGradient>
+            </defs>
+            <polygon points={beam.points} fill="url(#throw)" />
+          </svg>
+        )}
+
         <div
           className="plate__screen"
           style={{ width: CONTENT_W, height: contentH, transform }}
@@ -221,6 +280,34 @@ export default function WorkPlate({ onSelect }: { onSelect: (i: Item) => void })
                 vectorEffect="non-scaling-stroke"
               />
             </svg>
+            <button
+              className="plate__handle plate__handle--lens"
+              style={{ left: `${lens.x * 100}%`, top: `${lens.y * 100}%` }}
+              onPointerDown={(e) => {
+                e.preventDefault();
+                const host = hostRef.current;
+                if (!host) return;
+                const move = (ev: PointerEvent) => {
+                  const r = host.getBoundingClientRect();
+                  setLens({
+                    x: Math.min(1, Math.max(0, (ev.clientX - r.left) / r.width)),
+                    y: Math.min(1, Math.max(0, (ev.clientY - r.top) / r.height)),
+                  });
+                };
+                const up = () => {
+                  window.removeEventListener("pointermove", move);
+                  window.removeEventListener("pointerup", up);
+                  setLens((l) => {
+                    // eslint-disable-next-line no-console
+                    console.log("LENS =", JSON.stringify({ x: +l.x.toFixed(4), y: +l.y.toFixed(4) }));
+                    return l;
+                  });
+                };
+                window.addEventListener("pointermove", move);
+                window.addEventListener("pointerup", up);
+              }}
+              aria-label="projector lens"
+            />
             {quad.map((p, i) => (
               <button
                 key={i}
