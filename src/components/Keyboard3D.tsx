@@ -57,8 +57,8 @@ const ROW_TILT = [0, 0, 0, 0];
    world space - first tip the face to the camera, then roll around the view
    axis - so the angles mean what they say. */
 const POSE_TIP = 1.32; // about X: tips the face up toward the camera
-const POSE_ROLL = -(Math.PI / 2 - 0.46); // about Z: stands it on its corner
-const POSE_YAW = -0.3; // about Y: swings the right edge toward the viewer
+const POSE_ROLL = -0.4; // about Z: a diagonal lean, long axis still mostly horizontal
+const POSE_YAW = -0.65; // about Y: swings the right edge well forward of the left
 const FINAL_Q = new THREE.Quaternion()
   .setFromAxisAngle(new THREE.Vector3(0, 1, 0), POSE_YAW)
   .multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), POSE_ROLL))
@@ -404,13 +404,15 @@ function FitCamera({ width, depth }: { width: number; depth: number }) {
     // seen from three-quarters, the front corners sit much closer to the
     // camera than the centre does and blow past the edge of frame. So project
     // the real bounding corners and pull back until the worst one fits.
-    const hw = width / 2 + 0.24; // + the case lip
-    const hd = depth / 2 + 0.24;
+    // Match the case, which is built at width+1.15 / depth+1.15 - fitting to
+    // the key field alone let the case corners hang off the frame.
+    const hw = width / 2 + 0.62;
+    const hd = depth / 2 + 0.62;
 
     const corners: THREE.Vector3[] = [];
     for (const sx of [-1, 1]) {
       for (const sz of [-1, 1]) {
-        for (const sy of [-0.5, 0.7]) {
+        for (const sy of [-0.9, 0.68]) {
           const corner = new THREE.Vector3(sx * hw, sy, sz * hd).applyQuaternion(FINAL_Q);
           corner.y += 0.55; // the board's resting lift
           corners.push(corner);
@@ -418,7 +420,7 @@ function FitCamera({ width, depth }: { width: number; depth: number }) {
       }
     }
 
-    const FILL = 0.99; // fraction of the frame the board should occupy
+    const FILL = 0.93; // fraction of the frame the board should occupy
     const probe = new THREE.Vector3();
     let dist = 8;
 
