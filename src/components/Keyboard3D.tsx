@@ -1,11 +1,11 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Canvas, useFrame, useThree, type ThreeEvent } from "@react-three/fiber";
-import { Center, Text3D } from "@react-three/drei";
+import { Text3D } from "@react-three/drei";
 import * as THREE from "three";
 import { RoundedBoxGeometry } from "three-stdlib";
 import { LEGENDS } from "../data/legends";
 import { useKeycapGeometry, capGeometry, HEIGHT_RATIO } from "../data/keycapGeometry";
-import { legendGeometry, legendExtrude } from "../data/legendGeometry";
+import { legendGeometry, legendExtrude, brandLogo } from "../data/legendGeometry";
 import { playPress, playRelease, toggleSound } from "../data/keySound";
 
 /* ---------------------------------------------------------------------------
@@ -553,7 +553,7 @@ const CARD_LOGO_SIZE = 1.7;
 const CARD_TEXT_SIZE = 0.82;
 const CARD_WORDMARK_W = 3.2; // wordmarks are sized by width, not height
 /** Deep slab, like the freestanding letters in the hero plan - not signage. */
-const CARD_TEXT_DEPTH = 0.46;
+const CARD_TEXT_DEPTH = 0.82;
 /** The floor plane. The letters STAND on it rather than hovering over it. */
 const CARD_FLOOR_Y = -5.4;
 /** Turned to face right. Negative would swing the face to the left, which is
@@ -597,6 +597,7 @@ function cardTexture(label: string, onLoad?: () => void): CardTex | null {
 
 function HoverCard({ label, offset }: { label: string | null; offset: { x: number; z: number } }) {
   const group = useRef<THREE.Group>(null);
+  const textRef = useRef<THREE.Group>(null);
   // Keep the last real label mounted so leaving a key does not tear the
   // geometry down and rebuild it on the next hover.
   const [shown, setShown] = useState<string | null>(null);
@@ -606,8 +607,14 @@ function HoverCard({ label, offset }: { label: string | null; offset: { x: numbe
   }, [label]);
 
   const [, bump] = useState(0);
-  const solid = shown ? legendExtrude(shown) : null;
-  const card = shown && !solid ? cardTexture(shown, () => bump((n) => n + 1)) : null;
+  const rerender = useCallback(() => bump((n) => n + 1), []);
+  /* Preference order: the brand's real full-colour logo, then the monochrome
+     glyph the keycap uses, then the raster mask. The colour logo arrives a
+     frame or two late (it is fetched on hover), so the glyph shows meanwhile
+     and is simply replaced - no flash of empty. */
+  const logo = shown ? brandLogo(LEGENDS[shown]?.logo, rerender) : null;
+  const solid = shown && !logo ? legendExtrude(shown) : null;
+  const card = shown && !logo && !solid ? cardTexture(shown, rerender) : null;
   const brand = useMemo(
     () => new THREE.Color(cardInk(shown ? LEGENDS[shown]?.hex ?? "#ffffff" : "#ffffff")),
     [shown]
@@ -625,14 +632,34 @@ function HoverCard({ label, offset }: { label: string | null; offset: { x: numbe
      the ground plane: caption first, mark above it. A wordmark has no caption
      under it, so it stands on the ground itself. */
   const solidH = useMemo(() => {
-    if (!solid) return 0;
-    solid.computeBoundingBox();
-    const b = solid.boundingBox!;
-    return (b.max.y - b.min.y) * logoScale;
-  }, [solid, logoScale]);
+    const geos = logo ? logo.map((p) => p.geo) : solid ? [solid] : [];
+    if (!geos.length) return 0;
+    const box = new THREE.Box3();
+    for (const g of geos) {
+      g.computeBoundingBox();
+      box.union(g.boundingBox!);
+    }
+    return (box.max.y - box.min.y) * logoScale;
+  }, [logo, solid, logoScale]);
   const logoH = card ? cardW / card.aspect : solidH;
   const capBase = isWordmark ? 0 : CARD_TEXT_SIZE + 0.42;
   const logoY = capBase + logoH / 2;
+
+  /* Sit the word on the floor and centre it across, measured from the built
+     geometry. Text3D lays glyphs out from a baseline at y=0 with descenders
+     hanging BELOW it, so "Playwright" and "Python" dipped through the ground.
+     Reading the box here rather than assuming a nominal descender depth also
+     means it runs after the font has actually resolved. */
+  useEffect(() => {
+    const g = textRef.current;
+    const mesh = g?.children[0] as THREE.Mesh | undefined;
+    if (!g || !mesh?.geometry) return;
+    mesh.geometry.computeBoundingBox();
+    const b = mesh.geometry.boundingBox;
+    if (!b) return;
+    g.position.y = -b.min.y;
+    g.position.x = -(b.min.x + b.max.x) / 2;
+  }, [shown, isWordmark]);
 
   /* It appears, and that is all. No drift, no spin, no settle: these are meant
      to read as a landmark standing on the ground - the kind of freestanding
@@ -655,6 +682,23 @@ function HoverCard({ label, offset }: { label: string | null; offset: { x: numbe
           pool into the ground right at the corner of frame. */}
       <pointLight position={[2.4, 4.6, 3.6]} intensity={48} distance={20} color="#eaf0ff" />
       <pointLight position={[-2.4, 3.2, 2.4]} intensity={14} distance={11} color={brand} />
+
+      {/* the real logo: one solid per fill, each in its own colour */}
+      {logo && (
+        <group scale={logoScale} position={[0, logoY, 0]}>
+          {logo.map((part, i) => (
+            <mesh key={i} geometry={part.geo} castShadow>
+              <meshStandardMaterial
+                color={part.color}
+                emissive={part.color}
+                emissiveIntensity={0.22}
+                roughness={0.32}
+                metalness={0.12}
+              />
+            </mesh>
+          ))}
+        </group>
+      )}
 
       {solid && (
         <mesh geometry={solid} scale={logoScale} position={[0, logoY, 0]} castShadow>
@@ -679,8 +723,13 @@ function HoverCard({ label, offset }: { label: string | null; offset: { x: numbe
       {/* A wordmark already says the name; setting it again underneath just
           prints the word twice. */}
       {!isWordmark && (
-        // centred across, but NOT vertically: the baseline stays on the floor
-        <Center disableY position={[0, 0, 0]}>
+        /* Placed from its own bounding box rather than by drei's <Center>:
+           its baseline sits at y=0, so descenders on y, g, p and j sank
+           through the floor, and Center's vertical alignment measures the box
+           the other way round and buried the whole word. Reading min.y and
+           lifting by it rests the LOWEST point on the ground, which is how
+           cast letters actually sit. */
+        <group ref={textRef}>
           <Text3D
             font="/fonts/helvetiker_bold.typeface.json"
             size={CARD_TEXT_SIZE}
@@ -695,7 +744,7 @@ function HoverCard({ label, offset }: { label: string | null; offset: { x: numbe
             {shown}
             <meshStandardMaterial color="#f4f2ee" emissive="#7d8496" emissiveIntensity={0.16} roughness={0.34} metalness={0.2} />
           </Text3D>
-        </Center>
+        </group>
       )}
     </group>
   );

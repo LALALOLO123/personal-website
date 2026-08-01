@@ -1,4 +1,7 @@
 const si = require("simple-icons");
+/* Full-colour official logos for the hover card, written by
+   scripts/gen-brand-logos.cjs. The keycap keeps its monochrome glyph. */
+const BRAND_LOGOS = require("./brand-logos.json");
 const fs = require("fs");
 
 // slug -> [label, simple-icons slug]. `null` slug means the key gets a text
@@ -143,6 +146,7 @@ for (const [label, v] of Object.entries(VECTOR)) out[label] = v;
 for (const [label, v] of Object.entries(IMG)) out[label] = v;
 for (const [label, hex] of Object.entries(TEXT)) out[label] = { text: TEXT_LEGEND[label], hex };
 for (const label of WORDMARK) if (out[label]) out[label].wordmark = true;
+for (const [label, url] of Object.entries(BRAND_LOGOS)) if (out[label]) out[label].logo = url;
 
 /* These hexes used to be nudged so a near-black brand would still read as a
    MARK on a pale cap. The mark is white now and the cap wears the colour, so
@@ -159,6 +163,7 @@ const body = Object.entries(out)
     if (v.img) fields.push(`img: "${v.img}"`);
     if (v.text) fields.push(`text: "${v.text}"`);
     if (v.wordmark) fields.push("wordmark: true");
+    if (v.logo) fields.push(`logo: "${v.logo}"`);
     return `  ${JSON.stringify(label)}: { ${fields.join(", ")} },`;
   })
   .join("\n");
@@ -178,6 +183,8 @@ export type Legend = {
   text?: string;
   /** The mark already spells the name; the hover card omits the caption. */
   wordmark?: boolean;
+  /** Full-colour official logo, for the hover card only. */
+  logo?: string;
 };
 
 export const LEGENDS: Record<string, Legend> = {

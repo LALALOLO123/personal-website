@@ -34,6 +34,99 @@ function legendShapes(label: string) {
   return shapes.length ? { shapes, box } : null;
 }
 
+/* ---------------------------------------------------------------------------
+   Full-colour brand logos, for the hover card.
+
+   The keycap wears a monochrome glyph, which is right for a legend but is a
+   stylised stand-in. The card shows the mark as the brand publishes it, so
+   each fill in the source SVG becomes its own extruded solid carrying its own
+   colour. Fetched on hover and cached - they are only needed if someone
+   actually points at a key.
+   --------------------------------------------------------------------------- */
+
+export type LogoPart = { geo: THREE.BufferGeometry; color: string };
+
+const logoCache = new Map<string, LogoPart[] | null>();
+const logoInflight = new Set<string>();
+
+function buildLogo(svgText: string): LogoPart[] | null {
+  const parsed = loader.parse(svgText);
+  const parts: { geo: THREE.BufferGeometry; color: string }[] = [];
+
+  for (const p of parsed.paths) {
+    // Shading overlays are flattened to fill="none" at build time; skip them
+    // rather than painting a slab over the mark.
+    const fill = (p as unknown as { userData?: { style?: { fill?: string } } }).userData?.style?.fill;
+    if (fill === "none" || fill === "transparent") continue;
+
+    const shapes = SVGLoader.createShapes(
+      p as unknown as Parameters<typeof SVGLoader.createShapes>[0]
+    );
+    if (!shapes.length) continue;
+
+    const geo = new THREE.ExtrudeGeometry(shapes, {
+      depth: 26,
+      bevelEnabled: true,
+      bevelThickness: 2,
+      bevelSize: 1.6,
+      bevelSegments: 2,
+      curveSegments: 8,
+    });
+    parts.push({ geo, color: `#${p.color.getHexString()}` });
+  }
+  if (!parts.length) return null;
+
+  /* Normalise the WHOLE logo as one unit. Fitting each part to its own box
+     would scatter them - they only mean anything in their original relative
+     positions. */
+  const box = new THREE.Box3();
+  for (const { geo } of parts) {
+    geo.computeBoundingBox();
+    box.union(geo.boundingBox!);
+  }
+  const size = new THREE.Vector3();
+  const mid = new THREE.Vector3();
+  box.getSize(size);
+  box.getCenter(mid);
+  const s = 1 / Math.max(size.x, size.y);
+
+  parts.forEach(({ geo }, i) => {
+    geo.translate(-mid.x, -mid.y, -mid.z);
+    geo.scale(s, s, s);
+    // SVG y-down, undone by a proper rotation - scale(s,-s,s) would flip the
+    // determinant and turn every one of these solids inside out.
+    geo.rotateX(Math.PI);
+    // Coplanar fills z-fight; a hair of separation per layer settles it.
+    // After the rotation, so the layers stack toward the camera not away.
+    geo.translate(0, 0, i * 0.004);
+    geo.computeVertexNormals();
+    geo.computeBoundingSphere();
+  });
+
+  return parts;
+}
+
+/** Full-colour logo parts, or null while loading / when there is none.
+ *  `onReady` fires once the fetch lands so the caller can re-render. */
+export function brandLogo(url: string | undefined, onReady?: () => void): LogoPart[] | null {
+  if (!url) return null;
+  const hit = logoCache.get(url);
+  if (hit !== undefined) return hit;
+
+  if (!logoInflight.has(url)) {
+    logoInflight.add(url);
+    fetch(url)
+      .then((r) => (r.ok ? r.text() : Promise.reject(new Error(`logo ${r.status}`))))
+      .then((text) => logoCache.set(url, buildLogo(text)))
+      .catch(() => logoCache.set(url, null)) // fall back to the mono mark
+      .finally(() => {
+        logoInflight.delete(url);
+        onReady?.();
+      });
+  }
+  return null;
+}
+
 /** Fit a mark into a 1x1 square on the origin, keeping its aspect. */
 function normalise(geo: THREE.BufferGeometry) {
   geo.computeBoundingBox();
