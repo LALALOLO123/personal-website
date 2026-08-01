@@ -1440,9 +1440,12 @@ html {
   pointer-events: none;
   transition: opacity 0.95s cubic-bezier(0.6, 0, 0.7, 0.25);
 }
-/* with a real exit clip the pull to black is IN the footage, so this only
-   covers the last hair of the join; without one it is the whole beat */
-.film--exit .film__black  { opacity: 1; }
+/* With a REAL exit clip the pull to black is in the footage, so this must
+   stay out of the way until the very end - fading it during the clip would
+   darken the frame ahead of the robot and kill its last beat. It only snaps
+   on at the cut, to catch the join. Without a clip (--fallback) it IS the
+   whole blackout and fades across the beat. */
+.film--fallback.film--exit .film__black { opacity: 1; }
 .film--black .film__black { opacity: 1; transition: none; }
 
 .film__cue {

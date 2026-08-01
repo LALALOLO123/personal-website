@@ -101,7 +101,7 @@ const HeroFilm = forwardRef<HeroHandle, { active: boolean }>(function HeroFilm({
   }, [active]);
 
   return (
-    <div className={`film film--${phase}`} data-active={active}>
+    <div className={`film film--${phase} ${hasExit ? "" : "film--fallback"}`} data-active={active}>
       {/* the keyframe underneath everything: poster, fallback, and the frame
           every clip is anchored to */}
       <img className="film__still" src={KEYFRAME} alt="" draggable={false} />

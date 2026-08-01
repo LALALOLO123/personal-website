@@ -109,9 +109,24 @@ conditioned on it, so a flaw here is a flaw in all of them.
 
 **1. Keyframe (image).** Downtown street, daytime, street-level locked camera.
 BRIAN FU standing on the asphalt as oversized freestanding slab-serif letters:
-smooth painted composite, glossy white, rounded edges, chest-to-head height,
-the I-LOVE-NY / AMSTERDAM public-art genre. Iterate here — image models garble
-lettering on the first pass.
+smooth painted composite, glossy white, rounded edges, the I-LOVE-NY /
+AMSTERDAM public-art genre.
+
+**The robot IS the I in BRIAN.** It stands in the lineup, upright, arms at its
+sides, in the letter's slot and at the letters' exact height — so the name
+reads as BRIAN and the robot reads as type. Nobody should notice it on the
+first pass. The whole hero turns on that: when it steps out later, the reveal
+is that one of the letters was alive, which is why the Pixar lamp works and
+"a robot walks out from behind a sign" does not.
+
+Two things this forces, and both are cheap now and expensive later:
+- the letters must be **robot height** — a humanoid at human scale sets the
+  scale of the whole installation
+- the letters need a **common baseline** so the robot sits in the line rather
+  than beside it
+
+Iterate here — image models garble lettering on the first pass, and this one
+also has to sell a machine as a glyph.
 
 **2. Hold loop (video).** `start_image = end_image = keyframe`.
 
@@ -121,8 +136,9 @@ lettering on the first pass.
 > generated any other way has to be crossfaded and will drift.
 
 Ambient only: distant traffic crossing far background, light shifting, a flag
-or foliage moving. **The camera does not move. The letters do not move.**
-4-6 seconds.
+or foliage moving. **The camera does not move. The letters do not move — and
+the robot is a letter.** It must not shift, breathe or glance; the reveal only
+works if it was perfectly still. 4-6 seconds.
 
 **3. Intro (video).** `end_image = keyframe`, start from the same street empty.
 Two or three ordinary cars pass, then a white van crosses right-to-left as a
@@ -130,11 +146,16 @@ moving wipe — the street ahead of it empty, BRIAN FU standing in its wake, so
 the name completes left-to-right as the van exits frame. No morphing, no
 sparkle: the van passed and now they are there.
 
-**4. Exit (video).** `start_image = keyframe`. A grounded industrial humanoid —
-matte grey and off-white, scuffed, visible actuators, real weight, no chrome —
-steps out from behind the letters, walks to camera, reaches over the lens and
-pulls down. **Ends on full black.** The keyboard section opens on its own 2.4s
-blackout, so a black final frame cuts into it with nothing to match.
+**4. Exit (video).** `start_image = keyframe`. The I **steps out of the name** —
+a grounded industrial humanoid, matte grey and off-white, scuffed, visible
+actuators, real weight, no chrome — leaving a gap where the letter was. It
+walks to camera, reaches over the lens and pulls down. **Ends on full black.**
+
+The gap it leaves matters: BR_AN FU held for a beat is the joke landing. Do
+not let the model close it, and do not let another letter slide in.
+
+The keyboard section opens on its own 2.4s blackout, so a black final frame
+cuts into it with nothing to match.
 
 ### Constraints that apply to all four
 
@@ -148,3 +169,28 @@ blackout, so a black final frame cuts into it with nothing to match.
 `public/reels/hero-intro.mp4`, `hero-hold.mp4`, `hero-exit.mp4`, and the
 keyframe at `public/shots/hero-keyframe.jpg`. Each is optional and the
 sequence degrades cleanly without it, so they can land one at a time.
+
+
+## How the cut to black works
+
+A hard cut hidden under black, not a crossfade:
+
+1. Scroll fires the nav's gate; the exit clip plays and pulls to black in
+   frame.
+2. `stage-dark` goes on at the same moment, so the nav, progress dots and
+   cursor fade WITH the pull instead of surviving it — they live outside the
+   panel and were the only things left lit otherwise.
+3. The gate resolves on the clip's `ended`. A CSS black snaps opaque to catch
+   the join.
+4. The nav jumps **instantly** — `animate = false`. The screen is already
+   black, and animating a scroll nobody can see only delays the next section.
+5. The keyboard is already in its own 2.4s blackout, so there is nothing to
+   match on the other side.
+
+The CSS black deliberately does **not** fade during a real exit clip. Darkening
+the frame while the robot is still reaching would eat its last beat. It only
+fades across the whole beat in the fallback case, where there is no clip and it
+IS the blackout.
+
+Measured end to end on the placeholder: 0/255 at the cut, 5 through the
+keyboard blackout, first light at 4.3s when the lamp strikes.
