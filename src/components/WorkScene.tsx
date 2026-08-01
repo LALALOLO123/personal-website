@@ -56,6 +56,10 @@ const SCREEN_TALL = 8.2;
 const PROJ_LONG = 3.4;
 /** The image on the fabric. Slightly inside it, the way a real throw is. */
 const REEL_W = 4.4;
+
+/** Lens to fabric. */
+const BEAM_FROM = new THREE.Vector3(2.55, -0.28, 2.7);
+const BEAM_TO = new THREE.Vector3(0, 3.4, SCREEN_Z + 0.1);
 const PROJ_Z = 3.2;
 /** Off to one side, so it is not a silhouette against its own screen. */
 const PROJ_X = 2.9;
@@ -180,6 +184,17 @@ const SCREEN_URL = "/models/projector_screen/projector_screen.gltf";
 useGLTF.preload(PROJECTOR_URL);
 useGLTF.preload(SCREEN_URL);
 
+/** Which local axis a disc spins about: the one it is thinnest on. Derived
+ *  rather than hardcoded, because a guessed axis makes a reel wobble like a
+ *  dropped coin, which is exactly what it was doing. */
+function discAxis(o: THREE.Object3D): "x" | "y" | "z" {
+  const size = new THREE.Vector3();
+  new THREE.Box3().setFromObject(o).getSize(size);
+  if (size.x <= size.y && size.x <= size.z) return "x";
+  if (size.y <= size.x && size.y <= size.z) return "y";
+  return "z";
+}
+
 /** Fit a loaded model to a target size on its longest axis, sitting on y=0. */
 function fitToGround(obj: THREE.Object3D, target: number) {
   const box = new THREE.Box3().setFromObject(obj);
@@ -250,16 +265,17 @@ function ScreenProp({
 
 function Projector({ on }: { on: boolean }) {
   const { scene } = useGLTF(PROJECTOR_URL);
-  const spools = useRef<THREE.Object3D[]>([]);
+  const spools = useRef<{ o: THREE.Object3D; axis: "x" | "y" | "z" }[]>([]);
   const spot = useRef<THREE.SpotLight>(null);
   const lamp = useRef(0);
 
   const model = useMemo(() => {
     const c = scene.clone(true);
     fitToGround(c, PROJ_LONG);
-    const found: THREE.Object3D[] = [];
+    const found: { o: THREE.Object3D; axis: "x" | "y" | "z" }[] = [];
+    c.updateMatrixWorld(true);
     c.traverse((o) => {
-      if (/spool_(feed|takeup)/i.test(o.name)) found.push(o);
+      if (/spool_(feed|takeup)/i.test(o.name)) found.push({ o, axis: discAxis(o) });
       const m = o as THREE.Mesh;
       if (m.isMesh) {
         m.castShadow = true;
@@ -275,7 +291,7 @@ function Projector({ on }: { on: boolean }) {
     lamp.current += ((on ? 1 : 0) - lamp.current) * (1 - Math.exp(-dt * 9));
     if (spot.current) spot.current.intensity = 42 * lamp.current;
     // and the spools turn while it runs
-    for (const s of spools.current) s.rotation.z -= dt * 5.5 * lamp.current;
+    for (const s of spools.current) s.o.rotation[s.axis] -= dt * 5.5 * lamp.current;
   });
 
   return (
@@ -291,6 +307,89 @@ function Projector({ on }: { on: boolean }) {
         distance={22}
         color="#eaf0ff"
       />
+    </group>
+  );
+}
+
+
+/* ------------------------------- the beam --------------------------------- */
+
+/** The throw itself.
+ *
+ *  This is what was missing. Without it the scene is a screen, a machine and
+ *  some reels sharing a floor for no stated reason; with it they are one
+ *  event. A cone of additive haze from lens to fabric, plus motes drifting in
+ *  it so the light has something to catch on. */
+function Beam({ from, to, on }: { from: THREE.Vector3; to: THREE.Vector3; on: boolean }) {
+  const cone = useRef<THREE.Mesh>(null);
+  const dust = useRef<THREE.Points>(null);
+  const lit = useRef(0);
+
+  const { len, mid, quat } = useMemo(() => {
+    const dir = new THREE.Vector3().subVectors(to, from);
+    const len = dir.length();
+    const mid = new THREE.Vector3().addVectors(from, to).multiplyScalar(0.5);
+    // a cone points +Y by default; aim it down the throw
+    const quat = new THREE.Quaternion().setFromUnitVectors(
+      new THREE.Vector3(0, 1, 0),
+      dir.clone().normalize()
+    );
+    return { len, mid, quat };
+  }, [from, to]);
+
+  const motes = useMemo(() => {
+    const N = 420;
+    const pos = new Float32Array(N * 3);
+    for (let i = 0; i < N; i++) {
+      // uniform along the throw, random within the cone at that depth
+      const t = Math.random();
+      const r = Math.sqrt(Math.random()) * (0.12 + t * 2.05);
+      const a = Math.random() * Math.PI * 2;
+      pos[i * 3] = Math.cos(a) * r;
+      pos[i * 3 + 1] = (t - 0.5) * len;
+      pos[i * 3 + 2] = Math.sin(a) * r;
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+    return g;
+  }, [len]);
+
+  useFrame((state, dt) => {
+    lit.current += ((on ? 1 : 0) - lit.current) * (1 - Math.exp(-dt * 7));
+    const m = cone.current?.material as THREE.MeshBasicMaterial | undefined;
+    if (m) m.opacity = 0.055 * lit.current;
+    const dm = dust.current?.material as THREE.PointsMaterial | undefined;
+    if (dm) dm.opacity = 0.5 * lit.current;
+    // motes drift, so the beam is alive rather than a solid wedge
+    if (dust.current) dust.current.rotation.y = state.clock.elapsedTime * 0.06;
+  });
+
+  return (
+    <group position={mid} quaternion={quat}>
+      <mesh ref={cone} renderOrder={3}>
+        <coneGeometry args={[2.2, len, 40, 1, true]} />
+        <meshBasicMaterial
+          color="#cfe0ff"
+          transparent
+          opacity={0}
+          depthWrite={false}
+          blending={THREE.AdditiveBlending}
+          side={THREE.DoubleSide}
+          toneMapped={false}
+        />
+      </mesh>
+      <points ref={dust} geometry={motes} renderOrder={4}>
+        <pointsMaterial
+          size={0.035}
+          color="#e8f0ff"
+          transparent
+          opacity={0}
+          depthWrite={false}
+          blending={THREE.AdditiveBlending}
+          sizeAttenuation
+          toneMapped={false}
+        />
+      </points>
     </group>
   );
 }
@@ -327,6 +426,10 @@ function Cartridge({
     const size = new THREE.Vector3();
     box.getSize(size);
     c.scale.setScalar(1.15 / Math.max(size.x, size.y, size.z));
+    // stand it up facing the camera, whichever way the source spool was built
+    const axis = discAxis(c);
+    if (axis === "x") c.rotation.y = Math.PI / 2;
+    else if (axis === "y") c.rotation.x = Math.PI / 2;
     c.traverse((o) => {
       const m = o as THREE.Mesh;
       if (m.isMesh) {
@@ -340,7 +443,7 @@ function Cartridge({
   const parts = brandLogo(LEGENDS[item.face]?.logo, () => bump((n) => n + 1));
 
   const home = useMemo<[number, number, number]>(
-    () => [-3.6 + slot * 2.4, RACK_Y, RACK_Z],
+    () => [-4.9 + slot * 2.2, RACK_Y, RACK_Z],
     [slot]
   );
   const target = useMemo(() => new THREE.Vector3(), []);
@@ -377,7 +480,7 @@ function Cartridge({
       >
         <boxGeometry args={[1.7, 0.7, 1.7]} />
       </mesh>
-      {reel && <primitive object={reel} rotation={[Math.PI / 2, 0, 0]} />}
+      {reel && <primitive object={reel} />}
 
       {/* the project's mark, set into the reel hub */}
       {parts && (
@@ -421,6 +524,11 @@ function Stage({ onSelect }: { onSelect: (i: Item) => void }) {
     <>
       <Screen item={items[loaded]} />
       <Projector on={running} />
+      <Beam from={BEAM_FROM} to={BEAM_TO} on={running} />
+      {/* the fabric is the brightest thing in the room, so it should be the
+          thing lighting it - this is what puts the machine in the same space
+          as the screen rather than beside it */}
+      <pointLight position={[0, 3.4, SCREEN_Z + 1.2]} intensity={26} distance={16} color="#dce8ff" />
       {items.map((it, i) => (
         <Cartridge
           key={it.title}
@@ -444,26 +552,26 @@ export default function WorkScene({ onSelect }: { onSelect: (i: Item) => void })
       <Canvas
         shadows
         dpr={[1, 1.75]}
-        camera={{ position: [0, 4.4, 17.5], fov: 38 }}
+        camera={{ position: [-1.0, 3.5, 17.2], fov: 40 }}
         gl={{ alpha: true, antialias: true }}
         onCreated={({ gl, camera }) => {
           gl.toneMapping = THREE.ACESFilmicToneMapping;
           gl.toneMappingExposure = 1.0;
-          camera.lookAt(0, 1.5, 0);
+          camera.lookAt(0.6, 2.1, -0.6);
         }}
       >
-        <ambientLight intensity={0.32} color="#c9d2e2" />
+        <ambientLight intensity={0.16} color="#9fb0cc" />
         <spotLight
           position={[4, 11, 9]}
           angle={0.75}
           penumbra={0.9}
-          intensity={360}
+          intensity={150}
           decay={1.6}
           color="#f4f2ee"
           castShadow
           shadow-mapSize={[1024, 1024]}
         />
-        <directionalLight position={[-6, 4, 7]} intensity={0.35} color="#aebacc" />
+        <directionalLight position={[-6, 4, 7]} intensity={0.18} color="#aebacc" />
 
         <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -1.5, 0]} receiveShadow>
           <planeGeometry args={[60, 60]} />
