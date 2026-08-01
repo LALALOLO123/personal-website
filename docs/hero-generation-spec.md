@@ -60,8 +60,13 @@ to remove the letters guarantees the two are identical in every other respect.
 lettering model, and this frame lives or dies on the word being spelled
 correctly.
 
-**Params:** `aspect_ratio: "16:9"`, `count: 4` (four drafts per call — the
-lettering is a lottery and comparing four is far cheaper than four calls).
+**Params:** `aspect_ratio: "16:9"`, `resolution: "4k"`, `count: 4` (four drafts
+per call — the lettering is a lottery and comparing four beats four calls).
+
+> `resolution` **defaults to `1k`** and must be set explicitly. The keyframe is
+> shown full-bleed with `object-fit: cover`, so on a 1440p display it is
+> stretched across 2560px — 1k would be visibly soft, and this is the frame
+> people look at longest. Generate at 4k and compress down for the web.
 
 **Prompt — send verbatim:**
 
@@ -144,8 +149,16 @@ markings, sky and light must not shift. If they do, re-roll; do not accept
 **both** `start_image` and `end_image` conditioning, which is what makes the
 loop and the joins safe.
 
-**Shared params:** `aspect_ratio: "16:9"`, `generate_audio: false`, duration as
-noted per asset. Silent was decided; see `hero-video-plan.md`.
+**Shared params:** `aspect_ratio: "16:9"`, `generate_audio: false`,
+`resolution: "1080p"`, `mode: "std"`, `bitrate_mode: "standard"`, duration as
+noted per asset.
+
+> **`generate_audio` defaults to TRUE.** Forgetting it buys audio we decided
+> against, in a bigger file. It must be passed explicitly on every video call.
+>
+> `1080p` requires `mode: "std"` — `fast` only reaches 720p. 720p upscaled to a
+> 2560px hero is soft, and 4k is far too heavy for something that autoplays, so
+> 1080p/std is the only sensible point on that curve.
 
 **Preflight every video call with `get_cost: true` and report the number before
 submitting.** Video is where the budget goes.
@@ -209,6 +222,31 @@ but the clip going black on its own is much better and worth two more rolls.
 **Budget: 6 attempts per clip, 18 total.** Stop and review at that point.
 
 ---
+
+## 4.4 · Size, and why it is decided at generation time
+
+There is **no ffmpeg on this machine**, so whatever the model returns is what
+ships: resolution, duration and bitrate are irreversible once generated. Three
+1080p clips could plausibly total 15-25MB, which is far too heavy for a hero
+that autoplays.
+
+Before generating any video, install a transcoder so this is recoverable:
+
+```
+npm i -D ffmpeg-static
+```
+
+`ffmpeg-static` ships a prebuilt binary, so it needs no system install. With it
+we can compress after the fact and target roughly:
+
+| clip | budget |
+|---|---|
+| intro | ≤ 3MB — on the critical path, plays on load |
+| hold | ≤ 2MB — loops forever, so it wants to be smallest |
+| exit | ≤ 3MB — preloads during the hold, so it has time |
+
+Without it, the only lever is generating shorter and lower, and getting that
+wrong means paying twice.
 
 ## 5 · Integration and acceptance test
 
